@@ -4,8 +4,10 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { MeetingsClient } from "./meetings-client"
 
-export function MeetingsWrapper({ session }) {
+export function MeetingsWrapper({ session, initialUsers }) {
   const [searchQuery, setSearchQuery] = useState("")
+
+  console.log('MeetingsWrapper - initialUsers:', initialUsers)
 
   // Fetch meetings
   const {
@@ -42,7 +44,17 @@ export function MeetingsWrapper({ session }) {
     )
   }
 
-  // Use session user data
-  const users = session?.user ? [session.user] : []
-  return <MeetingsClient meetings={meetings} users={users} />
+  // Transform users data if needed
+  const transformedUsers = initialUsers?.map(user => ({
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    department: user.department,
+    role: user.role
+  })) || []
+
+  console.log('Transformed users:', transformedUsers)
+
+  return <MeetingsClient meetings={meetings} users={transformedUsers} />
 } 

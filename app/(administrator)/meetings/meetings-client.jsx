@@ -1,15 +1,30 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search } from "lucide-react"
 import { MeetingCard } from "@/components/meetings/meeting-card"
 import { MeetingModal } from "@/components/meetings/meeting-modal"
+import { AddParticipantModal } from "@/components/meetings/add-participant-modal"
 import { toast } from "sonner"
+import { getToken } from "@/lib/auth-client"
+import { useRouter } from "next/navigation"
 
 export function MeetingsClient({ meetings = [], users = [] }) {
-  console.log('Meetings data:', meetings) // Debug log
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false)
+  const [selectedMeeting, setSelectedMeeting] = useState(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
 
   const filterMeetings = (meetings, type) => {
     if (!meetings || !Array.isArray(meetings)) return []
@@ -30,6 +45,50 @@ export function MeetingsClient({ meetings = [], users = [] }) {
     })
   }
 
+  const handleAddParticipants = async (participants) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        toast.error('Authentication required')
+        return
+      }
+
+      console.log('Adding participants:', participants)
+
+      // Create participants one by one
+      for (const participant of participants) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/participants`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            data: {
+              user: participant.data.user,
+              meeting: participant.data.meeting,
+              participantRole: participant.data.participantRole,
+              department: participant.data.department
+            }
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Failed to add participant:', errorData)
+          throw new Error(`Failed to add participant: ${errorData.error?.message || response.statusText}`)
+        }
+      }
+
+      // Refresh the page to update the meetings list
+      router.refresh()
+      toast.success("Participants added successfully")
+    } catch (error) {
+      console.error('Error adding participants:', error)
+      toast.error(error.message || 'Failed to add participants')
+    }
+  }
+
   const scheduledMeetings = filterMeetings(meetings, 'scheduled')
   const pastMeetings = filterMeetings(meetings, 'past')
 
@@ -37,7 +96,7 @@ export function MeetingsClient({ meetings = [], users = [] }) {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Meetings</h1>
-        <Button>Add New Meeting</Button>
+        <Button onClick={() => setIsAddModalOpen(true)}>Add New Meeting</Button>
       </div>
 
       <div className="relative">
@@ -45,6 +104,8 @@ export function MeetingsClient({ meetings = [], users = [] }) {
         <Input
           placeholder="Search meetings..."
           className="pl-8"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
 
@@ -75,7 +136,10 @@ export function MeetingsClient({ meetings = [], users = [] }) {
                   }}
                   onEdit={() => {}}
                   onView={() => {}}
-                  onAddParticipant={() => {}}
+                  onAddParticipant={() => {
+                    setSelectedMeeting(meeting)
+                    setIsAddParticipantModalOpen(true)
+                  }}
                   onDelete={() => {}}
                   onJoin={() => {}}
                 />
@@ -104,7 +168,10 @@ export function MeetingsClient({ meetings = [], users = [] }) {
                   }}
                   onEdit={() => {}}
                   onView={() => {}}
-                  onAddParticipant={() => {}}
+                  onAddParticipant={() => {
+                    setSelectedMeeting(meeting)
+                    setIsAddParticipantModalOpen(true)
+                  }}
                   onDelete={() => {}}
                   onJoin={() => {}}
                 />
@@ -133,7 +200,10 @@ export function MeetingsClient({ meetings = [], users = [] }) {
                   }}
                   onEdit={() => {}}
                   onView={() => {}}
-                  onAddParticipant={() => {}}
+                  onAddParticipant={() => {
+                    setSelectedMeeting(meeting)
+                    setIsAddParticipantModalOpen(true)
+                  }}
                   onDelete={() => {}}
                   onJoin={() => {}}
                 />
@@ -142,6 +212,22 @@ export function MeetingsClient({ meetings = [], users = [] }) {
           </div>
         </TabsContent>
       </Tabs>
+
+      <MeetingModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        meeting={null}
+        onSave={() => {}}
+        users={users}
+      />
+
+      <AddParticipantModal
+        open={isAddParticipantModalOpen}
+        onOpenChange={setIsAddParticipantModalOpen}
+        meeting={selectedMeeting}
+        users={users}
+        onSave={handleAddParticipants}
+      />
     </div>
   )
 } 

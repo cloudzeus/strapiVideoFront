@@ -1,180 +1,127 @@
 "use client"
 
 import * as React from "react"
-import { Command as CommandPrimitive, useCommandState } from "cmdk"
 import { X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-
-export function useDebounce(value, delay = 500) {
-  const [debouncedValue, setDebouncedValue] = React.useState(value)
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay)
-    return () => clearTimeout(timer)
-  }, [value, delay])
-
-  return debouncedValue
-}
 
 export function MultipleSelector({
   value = [],
   onChange,
   placeholder,
   defaultOptions = [],
-  options,
-  delay,
-  onSearch,
-  onSearchSync,
-  loadingIndicator,
-  emptyIndicator,
-  maxSelected = Number.MAX_SAFE_INTEGER,
-  onMaxSelected,
-  hidePlaceholderWhenSelected,
-  disabled,
-  groupBy,
   className,
   badgeClassName,
-  selectFirstItem = true,
-  creatable = false,
-  triggerSearchOnFocus = false,
-  commandProps,
-  inputProps,
-  hideClearAllButton = false,
+  onSelect,
+  onUnselect,
 }) {
-  const inputRef = React.useRef(null)
   const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("")
   const [selected, setSelected] = React.useState(value)
-  const [availableOptions, setAvailableOptions] = React.useState(defaultOptions)
-  const debouncedSearchTerm = useDebounce(inputValue, delay)
+  const [searchTerm, setSearchTerm] = React.useState("")
 
   React.useEffect(() => {
-    if (value) {
-      setSelected(value)
-    }
+    setSelected(value)
   }, [value])
 
-  const handleUnselect = React.useCallback(
-    (option) => {
-      const newOptions = selected.filter((s) => s.value !== option.value)
-      setSelected(newOptions)
-      onChange?.(newOptions)
-    },
-    [onChange, selected]
-  )
+  const handleSelect = async (option) => {
+    if (onSelect) {
+      await onSelect(option)
+    } else {
+      const newSelected = [...selected, option]
+      setSelected(newSelected)
+      onChange?.(newSelected)
+    }
+    setSearchTerm("")
+  }
 
-  const handleKeyDown = React.useCallback(
-    (e) => {
-      const input = inputRef.current
-      if (input) {
-        if (e.key === "Delete" || e.key === "Backspace") {
-          if (input.value === "" && selected.length > 0) {
-            const lastSelectOption = selected[selected.length - 1]
-            if (!lastSelectOption.fixed) {
-              handleUnselect(selected[selected.length - 1])
-            }
-          }
-        }
-        if (e.key === "Escape") {
-          input.blur()
-        }
-      }
-    },
-    [handleUnselect, selected]
-  )
+  const handleUnselect = async (option) => {
+    if (onUnselect) {
+      await onUnselect(option)
+    } else {
+      const newSelected = selected.filter((item) => item.value !== option.value)
+      setSelected(newSelected)
+      onChange?.(newSelected)
+    }
+  }
 
-  const selectables = React.useMemo(() => {
-    return availableOptions.filter((option) => !selected.find((s) => s.value === option.value))
-  }, [availableOptions, selected])
+  const filteredOptions = defaultOptions.filter(
+    (option) => 
+      !selected.find((item) => item.value === option.value) &&
+      (option.searchText || option.label.toLowerCase()).includes(searchTerm.toLowerCase())
+  )
 
   return (
-    <Command
-      onKeyDown={handleKeyDown}
-      className={cn("overflow-visible bg-transparent", className)}
-      {...commandProps}
-    >
-      <div className="group rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-        <div className="flex flex-wrap gap-1">
-          {selected.map((option) => (
-            <Badge
-              key={option.value}
-              variant="secondary"
-              className={cn(
-                "hover:bg-secondary/80",
-                badgeClassName
-              )}
-            >
-              {option.label}
-              <button
-                className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleUnselect(option)
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onClick={() => handleUnselect(option)}
-              >
-                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-              </button>
-            </Badge>
-          ))}
-          <CommandPrimitive.Input
-            ref={inputRef}
-            value={inputValue}
-            onValueChange={setInputValue}
-            onBlur={() => setOpen(false)}
+    <div className={cn("space-y-2", className)}>
+      <div className="relative">
+        <div className="group rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={placeholder}
             onFocus={() => setOpen(true)}
-            placeholder={hidePlaceholderWhenSelected && selected.length > 0 ? "" : placeholder}
-            disabled={disabled}
-            className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1"
-            {...inputProps}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
           />
         </div>
-      </div>
-      <div className="relative mt-2">
         {open && (
-          <div className="absolute top-0 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
-            <CommandList className="h-full overflow-auto">
-              {selectables.length === 0 ? (
-                <div className="py-6 text-center text-sm">
-                  {emptyIndicator || "No results found."}
-                </div>
+          <div className="absolute top-full z-10 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+            <div className="max-h-[200px] overflow-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="py-6 text-center text-sm">No results found.</div>
               ) : (
-                <CommandGroup className="h-full overflow-auto">
-                  {selectables.map((option) => (
-                    <CommandItem
+                <div>
+                  {filteredOptions.map((option) => (
+                    <div
                       key={option.value}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      onSelect={() => {
-                        if (selected.length >= maxSelected) {
-                          onMaxSelected?.(selected.length)
-                          return
-                        }
-                        setInputValue("")
-                        const newOptions = [...selected, option]
-                        setSelected(newOptions)
-                        onChange?.(newOptions)
-                      }}
-                      className="cursor-pointer"
+                      onClick={() => handleSelect(option)}
+                      className="cursor-pointer px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                     >
                       {option.label}
-                    </CommandItem>
+                    </div>
                   ))}
-                </CommandGroup>
+                </div>
               )}
-            </CommandList>
+            </div>
           </div>
         )}
       </div>
-    </Command>
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          <TooltipProvider>
+            {selected.map((option) => (
+              <Tooltip key={option.value}>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "bg-black text-white hover:bg-black/90",
+                      badgeClassName
+                    )}
+                  >
+                    <span className="text-[9px]">{option.email}</span>
+                    <button
+                      className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onClick={() => handleUnselect(option)}
+                    >
+                      <X className="h-3 w-3 text-white hover:text-white/80" />
+                    </button>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    {option.label}
+                    {option.department && <span><br />Department: {option.department}</span>}
+                    {option.role && <span><br />Role: {option.role}</span>}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </TooltipProvider>
+        </div>
+      )}
+    </div>
   )
 } 
