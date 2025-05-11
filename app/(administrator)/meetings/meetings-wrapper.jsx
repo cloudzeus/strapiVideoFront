@@ -1,60 +1,74 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useEffect } from "react"
 import { MeetingsClient } from "./meetings-client"
+import { toast } from "sonner"
 
-export function MeetingsWrapper({ session, initialUsers }) {
+export function MeetingsWrapper({ initialMeetings = [], initialUsers = [] }) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [meetings, setMeetings] = useState(initialMeetings)
+  const [users, setUsers] = useState(initialUsers)
+  const [error, setError] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  console.log('MeetingsWrapper - initialUsers:', initialUsers)
-
-  // Fetch meetings
-  const {
-    data: meetings,
-    error: meetingsError,
-    status: meetingsStatus
-  } = useQuery({
-    queryKey: ["meetings"],
-    queryFn: async () => {
-      console.log('Fetching meetings...')
-      const response = await fetch('http://localhost:1337/api/meetings/?populate=*', { 
-        credentials: 'include',
-        cache: 'no-store'
-      })
-      if (!response.ok) {
-        console.error('Meetings fetch failed:', response.status, response.statusText)
-        throw new Error('Failed to fetch meetings')
+  const fetchMeetings = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+      const token = localStorage.getItem('token')
+      
+      if (!token) {
+        throw new Error('No authentication token found')
       }
+
+      const response = await fetch(`${apiUrl}/api/meetings?populate=*`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API Error:', errorData)
+        throw new Error(errorData.error?.message || `Failed to fetch meetings: ${response.status}`)
+      }
+
       const data = await response.json()
-      console.log('Meetings fetched:', data)
-      return data.data || []
+      console.log('Fetched meetings:', data)
+
+      if (!data.data) {
+        throw new Error('Invalid meetings data received')
+      }
+
+      setMeetings(data.data)
+    } catch (error) {
+      console.error('Error fetching meetings:', error)
+      setError(error.message)
+      toast.error(error.message)
+    } finally {
+      setIsLoading(false)
     }
-  })
-
-  if (meetingsStatus === "loading") {
-    return <div className="text-xs">Loading meetings...</div>
   }
 
-  if (meetingsError) {
-    return (
-      <div className="text-xs text-red-500">
-        Error: {meetingsError.message}
-      </div>
-    )
+  useEffect(() => {
+    fetchMeetings()
+  }, [])
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
-  // Transform users data if needed
-  const transformedUsers = initialUsers?.map(user => ({
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    email: user.email,
-    department: user.department,
-    role: user.role
-  })) || []
+  if (error) {
+    return <div>Error: {error}</div>
+  }
 
-  console.log('Transformed users:', transformedUsers)
-
-  return <MeetingsClient meetings={meetings} users={transformedUsers} />
+  return (
+    <MeetingsClient 
+      meetings={meetings} 
+      users={users} 
+      onMeetingUpdate={fetchMeetings}
+    />
+  )
 } 

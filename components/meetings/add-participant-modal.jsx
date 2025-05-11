@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultipleSelector } from "@/components/ui/multiple-selector"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
 
 // Participant role enum
 const PARTICIPANT_ROLES = {
@@ -28,111 +29,90 @@ export function AddParticipantModal({
 
   useEffect(() => {
     if (open && meeting) {
-      console.log('Modal opened with meeting:', meeting)
-      console.log('Raw users data:', users)
       fetchExistingParticipants()
     }
-  }, [open, meeting, users])
+  }, [open, meeting])
 
   const fetchExistingParticipants = async () => {
     try {
-      setIsLoading(true)
       const token = localStorage.getItem('token')
-      if (!token) {
-        console.error('No token found in localStorage')
-        toast.error('Authentication required')
-        return
-      }
+      if (!token) return
 
-      console.log('Fetching participants for meeting:', meeting.id)
-      console.log('Using token:', token)
-
-      const url = `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/participants?filters[meeting][id][$eq]=${meeting.id}&populate=user`
-      console.log('Fetching from URL:', url)
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/participants?filters[meeting][id][$eq]=${meeting.id}&populate=user`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error response:', errorText)
-        throw new Error(`Failed to fetch participants: ${response.status} ${response.statusText}`)
-      }
-
+      )
       const data = await response.json()
-      console.log('Fetched existing participants:', data)
       setExistingParticipants(data.data || [])
     } catch (error) {
       console.error('Error fetching participants:', error)
-      toast.error(error.message || 'Failed to fetch existing participants')
-    } finally {
-      setIsLoading(false)
+      toast.error('Failed to fetch existing participants')
     }
   }
 
-  // Get IDs of users who are already participants
-  const existingParticipantIds = existingParticipants.map(
-    participant => participant.attributes?.user?.data?.id
-  ).filter(Boolean)
-
-  console.log('Existing participant IDs:', existingParticipantIds)
-
   // Filter out users who are already participants
-  const availableUsers = users.filter(user => !existingParticipantIds.includes(user.id))
-  console.log('Available users after filtering:', availableUsers)
+  const availableUsers = users.filter(user => 
+    !existingParticipants.some(participant => 
+      participant.attributes?.user?.data?.id === user.id
+    )
+  )
 
-  // Format users for the multiple selector
   const userOptions = availableUsers.map(user => {
-    const displayName = user.name || user.username || 'Unknown User'
-    const departmentName = user.department?.name || 'No Department'
-    const option = {
+    const displayName = user.attributes?.username || user.username || 'Unknown User'
+    const departmentName = user.attributes?.department?.name || 'No Department'
+    return {
       label: (
         <div className="text-[10px]">
           <div>{displayName}</div>
-          <div>{user.email}</div>
+          <div>{user.attributes?.email || user.email}</div>
           <div>{departmentName}</div>
         </div>
       ),
       value: user.id.toString(),
-      email: user.email,
+      email: user.attributes?.email || user.email,
       department: departmentName,
-      role: user.role,
-      searchText: `${displayName} ${user.email} ${departmentName}`.toLowerCase()
+      role: user.attributes?.role || user.role,
+      searchText: `${displayName} ${user.attributes?.email || user.email} ${departmentName}`.toLowerCase()
     }
-    console.log('Created option:', option)
-    return option
   })
 
   const handleUserSelect = async (selectedOption) => {
     try {
+      setIsLoading(true)
       const selectedUser = users.find(u => u.id.toString() === selectedOption.value)
       const participant = {
         data: {
           user: selectedUser.id,
           meeting: meeting.id,
           participantRole: role,
-          ...(selectedUser.department?.id && { department: selectedUser.department.id })
+          ...(selectedUser.attributes?.department?.id && { department: selectedUser.attributes.department.id })
         }
       }
 
-      console.log('Adding participant:', participant)
       await onSave([participant])
       
       // Add to selected users
       setSelectedUsers(prev => [...prev, selectedOption])
       
+      // Refresh existing participants
+      await fetchExistingParticipants()
+      
       toast.success("Participant added successfully")
     } catch (error) {
       console.error('Error adding participant:', error)
       toast.error(error.message || "Failed to add participant")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleUserUnselect = async (unselectedOption) => {
     try {
+      setIsLoading(true)
       // Remove from selected users
       setSelectedUsers(prev => prev.filter(user => user.value !== unselectedOption.value))
       
@@ -141,35 +121,55 @@ export function AddParticipantModal({
     } catch (error) {
       console.error('Error removing participant:', error)
       toast.error(error.message || "Failed to remove participant")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add Participants</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="users">Select Users</Label>
+        
+        <div className="space-y-4">
+          {existingParticipants.length > 0 && (
+            <div className="space-y-2">
+              <Label>Current Participants</Label>
+              <div className="flex flex-wrap gap-2">
+                {existingParticipants.map((participant) => (
+                  <Badge key={participant.id} variant="secondary">
+                    {participant.attributes?.user?.data?.attributes?.username || 'Anonymous'}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Select User</Label>
             <MultipleSelector
               value={selectedUsers}
-              onChange={setSelectedUsers}
+              onChange={handleUserSelect}
               defaultOptions={userOptions}
-              placeholder="Select users..."
+              placeholder="Search users..."
               emptyIndicator={
                 <p className="text-center text-sm text-muted-foreground">
-                  {isLoading ? "Loading users..." : "No users available"}
+                  No users found.
                 </p>
               }
-              onSelect={handleUserSelect}
-              onUnselect={handleUserUnselect}
+              disabled={isLoading}
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={setRole}>
+
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select
+              value={role}
+              onValueChange={setRole}
+              disabled={isLoading}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
@@ -179,11 +179,24 @@ export function AddParticipantModal({
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Done
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

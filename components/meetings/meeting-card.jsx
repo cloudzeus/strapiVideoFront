@@ -1,118 +1,137 @@
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+"use client"
+
+import { useState } from "react"
+import { format } from "date-fns"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { format, isValid } from "date-fns"
-import { Pencil, Eye, UserPlus, Trash2, Video, Clock, Calendar } from "lucide-react"
+import { MeetingModal } from "./meeting-modal"
+import { toast } from "sonner"
+import { Pencil, Trash2, Video, User, Calendar, Users } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useRouter } from "next/navigation"
 
-export function MeetingCard({ meeting, onEdit, onView, onAddParticipant, onDelete, onJoin }) {
-  const getStatusColor = (startTime, endTime) => {
-    try {
-      const now = new Date()
-      const start = new Date(startTime)
-      const end = new Date(endTime)
+export function MeetingCard({ meeting, onDelete, onUpdate }) {
+  const router = useRouter()
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
-      if (!isValid(start) || !isValid(end)) return "bg-gray-100 text-gray-800"
-      if (now < start) return "bg-blue-100 text-blue-800"
-      if (now >= start && now <= end) return "bg-green-100 text-green-800"
-      return "bg-gray-100 text-gray-800"
-    } catch (error) {
-      console.error('Error calculating status color:', error)
-      return "bg-gray-100 text-gray-800"
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-500'
+      case 'in_progress':
+        return 'bg-green-500'
+      case 'completed':
+        return 'bg-gray-500'
+      case 'cancelled':
+        return 'bg-red-500'
+      default:
+        return 'bg-gray-500'
     }
   }
 
-  const getStatusText = (startTime, endTime) => {
+  const handleDelete = async () => {
     try {
-      const now = new Date()
-      const start = new Date(startTime)
-      const end = new Date(endTime)
-
-      if (!isValid(start) || !isValid(end)) return "Invalid Date"
-      if (now < start) return "Scheduled"
-      if (now >= start && now <= end) return "Active"
-      return "Completed"
+      await onDelete(meeting.id)
+      toast.success("Meeting deleted successfully")
     } catch (error) {
-      console.error('Error calculating status text:', error)
-      return "Invalid Date"
+      console.error('Error deleting meeting:', error)
+      toast.error("Failed to delete meeting")
     }
   }
 
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString)
-      if (!isValid(date)) return "Invalid Date"
-      return format(date, "PPP HH:mm")
-    } catch (error) {
-      console.error('Error formatting date:', error)
-      return "Invalid Date"
-    }
+  const handleJoin = () => {
+    router.push(`/room-meet/${meeting.id}`)
   }
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardContent className="flex-grow p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-[11px] font-bold line-clamp-1">{meeting.name || 'Untitled Meeting'}</h3>
-          <Badge className={getStatusColor(meeting.startTime, meeting.endTime)}>
-            {getStatusText(meeting.startTime, meeting.endTime)}
-          </Badge>
-        </div>
-        <p className="text-[10px] text-muted-foreground mb-3 line-clamp-2">
-          {meeting.description || 'No description provided'}
-        </p>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-bold">{formatDate(meeting.startTime)}</span>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-lg font-semibold">
+              {meeting.attributes?.name || meeting.name}
+            </CardTitle>
+            <Badge className={getStatusColor(meeting.attributes?.jitsiStatus || meeting.jitsiStatus)}>
+              {meeting.attributes?.jitsiStatus || meeting.jitsiStatus}
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-bold">{formatDate(meeting.endTime)}</span>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-4">
+            {meeting.attributes?.description || meeting.description}
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center text-sm">
+              <Calendar className="h-4 w-4 mr-2" />
+              <span>
+                {format(new Date(meeting.attributes?.startTime || meeting.startTime), "PPP HH:mm")} -{" "}
+                {format(new Date(meeting.attributes?.endTime || meeting.endTime), "HH:mm")}
+              </span>
+            </div>
+            <div className="flex items-center text-sm">
+              <Users className="h-4 w-4 mr-2" />
+              <span>
+                {(meeting.attributes?.users?.data?.length || meeting.users?.length || 0)} Participants
+              </span>
+            </div>
           </div>
-        </div>
-      </CardContent>
-      <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onEdit}
-          className="h-7 w-7 rounded-[8px] bg-gray-900 hover:bg-orange-500 group"
-        >
-          <Pencil className="h-3 w-3 text-orange-500 group-hover:text-gray-900" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onView}
-          className="h-7 w-7 rounded-[8px] bg-gray-900 hover:bg-orange-500 group"
-        >
-          <Eye className="h-3 w-3 text-orange-500 group-hover:text-gray-900" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onAddParticipant}
-          className="h-7 w-7 rounded-[8px] bg-gray-900 hover:bg-orange-500 group"
-        >
-          <UserPlus className="h-3 w-3 text-orange-500 group-hover:text-gray-900" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onDelete}
-          className="h-7 w-7 rounded-[8px] bg-gray-900 hover:bg-orange-500 group"
-        >
-          <Trash2 className="h-3 w-3 text-orange-500 group-hover:text-gray-900" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onJoin}
-          className="h-7 w-7 rounded-[8px] bg-gray-900 hover:bg-orange-500 group"
-        >
-          <Video className="h-3 w-3 text-orange-500 group-hover:text-gray-900" />
-        </Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <div className="flex space-x-2">
+            <Button
+              className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
+              size="icon"
+              onClick={() => setIsEditModalOpen(true)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
+              size="icon"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleJoin}>
+            <Video className="h-4 w-4 mr-2" />
+            Join Meeting
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <MeetingModal
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        meeting={meeting}
+        onSave={onUpdate}
+      />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the meeting.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 } 

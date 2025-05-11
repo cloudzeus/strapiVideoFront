@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 
 export async function getUsers() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get('token')?.value
 
     if (!token) {
@@ -10,37 +10,24 @@ export async function getUsers() {
       return []
     }
 
-    console.log('Fetching users with token:', token)
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users?populate=department`, {
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+    const response = await fetch(`${apiUrl}/api/users?populate=department`, {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      cache: 'no-store'
     })
 
     if (!response.ok) {
-      console.error('Failed to fetch users:', response.status, response.statusText)
-      return []
+      const errorData = await response.json()
+      console.error('API Error:', errorData)
+      throw new Error(errorData.error?.message || 'Failed to fetch users')
     }
 
     const data = await response.json()
-    console.log('Raw API response:', data)
-
-    // Transform the data to ensure it has the correct structure
-    const users = data.map(user => ({
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      department: user.department ? {
-        id: user.department.id,
-        name: user.department.name
-      } : null,
-      role: user.role?.name
-    })) || []
-
-    console.log('Transformed users:', users)
-    return users
+    console.log('Raw users response:', data)
+    return data
   } catch (error) {
     console.error('Error fetching users:', error)
     return []

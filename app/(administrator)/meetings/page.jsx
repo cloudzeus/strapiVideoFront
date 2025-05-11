@@ -1,20 +1,62 @@
-import { Suspense } from "react"
-import { MeetingsWrapper } from "./meetings-wrapper"
-import { requireAdmin } from "@/app/actions/auth"
-import { getUsers } from "@/app/actions/users"
+import { cookies } from 'next/headers'
+import { MeetingsWrapper } from '@/components/meetings/meetings-wrapper'
 
-// This is a Server Component
+async function getMeetings() {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+
+    if (!token) {
+      console.log('No token found')
+      return { meetings: [], users: [] }
+    }
+
+    // Fetch meetings
+    const meetingsResponse = await fetch(`${apiUrl}/api/meetings?populate=users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      cache: 'no-store'
+    })
+
+    if (!meetingsResponse.ok) {
+      console.error('Failed to fetch meetings:', meetingsResponse.status)
+      return { meetings: [], users: [] }
+    }
+
+    const meetingsData = await meetingsResponse.json()
+    const meetings = meetingsData.data || []
+
+    // Fetch users
+    const usersResponse = await fetch(`${apiUrl}/api/users?populate=*`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      cache: 'no-store'
+    })
+
+    if (!usersResponse.ok) {
+      console.error('Failed to fetch users:', usersResponse.status)
+      return { meetings, users: [] }
+    }
+
+    const usersData = await usersResponse.json()
+    const users = usersData || []
+
+    return { meetings, users }
+  } catch (error) {
+    console.error('Error fetching data:', error)
+    return { meetings: [], users: [] }
+  }
+}
+
 export default async function MeetingsPage() {
-  const session = await requireAdmin()
-  const users = await getUsers()
-  
-  console.log('MeetingsPage - Raw users data:', users)
+  const { meetings, users } = await getMeetings()
 
   return (
-    <div className="p-6 h-[calc(100vh-4rem)] overflow-hidden">
-      <Suspense fallback={<div className="text-xs">Loading meetings...</div>}>
-        <MeetingsWrapper session={session} initialUsers={users} />
-      </Suspense>
+    <div className="container mx-auto py-6">
+      <MeetingsWrapper initialMeetings={meetings} initialUsers={users} />
     </div>
   )
 } 

@@ -7,15 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search } from "lucide-react"
 import { MeetingCard } from "@/components/meetings/meeting-card"
 import { MeetingModal } from "@/components/meetings/meeting-modal"
-import { AddParticipantModal } from "@/components/meetings/add-participant-modal"
 import { toast } from "sonner"
 import { getToken } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 
-export function MeetingsClient({ meetings = [], users = [] }) {
+export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false)
   const [selectedMeeting, setSelectedMeeting] = useState(null)
   const router = useRouter()
 
@@ -26,77 +24,62 @@ export function MeetingsClient({ meetings = [], users = [] }) {
     }
   }, [router])
 
-  const filterMeetings = (meetings, type) => {
-    if (!meetings || !Array.isArray(meetings)) return []
-    
-    return meetings.filter(meeting => {
-      if (!meeting?.startTime) return false
-      const startTime = new Date(meeting.startTime)
-      const now = new Date()
-      
-      switch (type) {
-        case 'scheduled':
-          return startTime > now
-        case 'past':
-          return startTime <= now
-        default:
-          return true
-      }
-    })
+  useEffect(() => {
+    console.log('MeetingsClient - Received meetings:', meetings)
+  }, [meetings])
+
+  const handleJoinMeeting = (meeting) => {
+    router.push(`/room-meet/${meeting.id}`)
   }
 
-  const handleAddParticipants = async (participants) => {
+  const handleEditMeeting = (meeting) => {
+    setSelectedMeeting(meeting)
+    setIsAddModalOpen(true)
+  }
+
+  const handleSaveMeeting = async (meeting) => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        toast.error('Authentication required')
-        return
-      }
-
-      console.log('Adding participants:', participants)
-
-      // Create participants one by one
-      for (const participant of participants) {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/participants`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            data: {
-              user: participant.data.user,
-              meeting: participant.data.meeting,
-              participantRole: participant.data.participantRole,
-              department: participant.data.department
-            }
-          })
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.error('Failed to add participant:', errorData)
-          throw new Error(`Failed to add participant: ${errorData.error?.message || response.statusText}`)
-        }
-      }
-
-      // Refresh the page to update the meetings list
-      router.refresh()
-      toast.success("Participants added successfully")
+      // Call the update function from parent
+      await onMeetingUpdate()
+      toast.success("Meeting saved successfully")
     } catch (error) {
-      console.error('Error adding participants:', error)
-      toast.error(error.message || 'Failed to add participants')
+      console.error('Error updating meetings list:', error)
+      toast.error("Failed to update meetings list")
     }
+  }
+
+  const filterMeetings = (meetings, status) => {
+    const now = new Date()
+    return meetings.filter(meeting => {
+      const startTime = new Date(meeting.startTime)
+      const endTime = new Date(meeting.endTime)
+      
+      if (status === 'scheduled') {
+        return startTime > now
+      } else if (status === 'past') {
+        return endTime < now
+      }
+      return true
+    })
   }
 
   const scheduledMeetings = filterMeetings(meetings, 'scheduled')
   const pastMeetings = filterMeetings(meetings, 'past')
 
+  console.log('Filtered meetings:', {
+    all: meetings,
+    scheduled: scheduledMeetings,
+    past: pastMeetings
+  })
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Meetings</h1>
-        <Button onClick={() => setIsAddModalOpen(true)}>Add New Meeting</Button>
+        <Button onClick={() => {
+          setSelectedMeeting(null)
+          setIsAddModalOpen(true)
+        }}>Add New Meeting</Button>
       </div>
 
       <div className="relative">
@@ -126,22 +109,11 @@ export function MeetingsClient({ meetings = [], users = [] }) {
               meetings.map((meeting) => (
                 <MeetingCard
                   key={meeting.id}
-                  meeting={{
-                    id: meeting.id,
-                    name: meeting.name,
-                    description: meeting.description,
-                    startTime: meeting.startTime,
-                    endTime: meeting.endTime,
-                    participants: meeting.participants || []
-                  }}
-                  onEdit={() => {}}
+                  meeting={meeting}
+                  onEdit={() => handleEditMeeting(meeting)}
                   onView={() => {}}
-                  onAddParticipant={() => {
-                    setSelectedMeeting(meeting)
-                    setIsAddParticipantModalOpen(true)
-                  }}
                   onDelete={() => {}}
-                  onJoin={() => {}}
+                  onJoin={() => handleJoinMeeting(meeting)}
                 />
               ))
             )}
@@ -158,22 +130,11 @@ export function MeetingsClient({ meetings = [], users = [] }) {
               scheduledMeetings.map((meeting) => (
                 <MeetingCard
                   key={meeting.id}
-                  meeting={{
-                    id: meeting.id,
-                    name: meeting.name,
-                    description: meeting.description,
-                    startTime: meeting.startTime,
-                    endTime: meeting.endTime,
-                    participants: meeting.participants || []
-                  }}
-                  onEdit={() => {}}
+                  meeting={meeting}
+                  onEdit={() => handleEditMeeting(meeting)}
                   onView={() => {}}
-                  onAddParticipant={() => {
-                    setSelectedMeeting(meeting)
-                    setIsAddParticipantModalOpen(true)
-                  }}
                   onDelete={() => {}}
-                  onJoin={() => {}}
+                  onJoin={() => handleJoinMeeting(meeting)}
                 />
               ))
             )}
@@ -190,22 +151,11 @@ export function MeetingsClient({ meetings = [], users = [] }) {
               pastMeetings.map((meeting) => (
                 <MeetingCard
                   key={meeting.id}
-                  meeting={{
-                    id: meeting.id,
-                    name: meeting.name,
-                    description: meeting.description,
-                    startTime: meeting.startTime,
-                    endTime: meeting.endTime,
-                    participants: meeting.participants || []
-                  }}
-                  onEdit={() => {}}
+                  meeting={meeting}
+                  onEdit={() => handleEditMeeting(meeting)}
                   onView={() => {}}
-                  onAddParticipant={() => {
-                    setSelectedMeeting(meeting)
-                    setIsAddParticipantModalOpen(true)
-                  }}
                   onDelete={() => {}}
-                  onJoin={() => {}}
+                  onJoin={() => handleJoinMeeting(meeting)}
                 />
               ))
             )}
@@ -216,17 +166,9 @@ export function MeetingsClient({ meetings = [], users = [] }) {
       <MeetingModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
-        meeting={null}
-        onSave={() => {}}
-        users={users}
-      />
-
-      <AddParticipantModal
-        open={isAddParticipantModalOpen}
-        onOpenChange={setIsAddParticipantModalOpen}
         meeting={selectedMeeting}
+        onSave={handleSaveMeeting}
         users={users}
-        onSave={handleAddParticipants}
       />
     </div>
   )

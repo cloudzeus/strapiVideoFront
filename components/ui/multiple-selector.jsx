@@ -74,7 +74,7 @@ export function MultipleSelector({
                 <div>
                   {filteredOptions.map((option) => (
                     <div
-                      key={option.value}
+                      key={`option-${option.value}`}
                       onClick={() => handleSelect(option)}
                       className="cursor-pointer px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                     >
@@ -92,7 +92,7 @@ export function MultipleSelector({
         <div className="flex flex-wrap gap-1">
           <TooltipProvider>
             {selected.map((option) => (
-              <Tooltip key={option.value}>
+              <Tooltip key={`tooltip-${option.value}`}>
                 <TooltipTrigger asChild>
                   <Badge
                     variant="secondary"
