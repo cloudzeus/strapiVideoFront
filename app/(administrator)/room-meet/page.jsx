@@ -117,12 +117,12 @@ export default function RoomMeet() {
         </button>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {meetings.map((meeting) => (
-          <div key={meeting.id} className="rounded-lg border bg-card p-4">
+          <div key={meeting.id} className="rounded-lg border bg-card p-4 shadow-2xl hover:bg-gray-300">
             <div className="flex justify-between items-center">
               <div className="flex-1">
-                <h3 className="font-semibold text-lg">{meeting.attributes.title}</h3>
+                <h3 className="font-semibold text-sm">{meeting.attributes.title}</h3>
                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                   <div className="flex items-center gap-1">
                     <Calendar size={16} />

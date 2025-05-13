@@ -724,9 +724,9 @@ export function OrganizationsList({
   return (
     <>
       <div className="h-[calc(100%-3rem)] overflow-y-auto">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 p-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 p-1">
           {filteredOrgs.map((org) => (
-            <Card key={org.id} className="h-[320px] w-full min-w-0">
+            <Card key={org.id} className="h-[300px] w-full min-w-0 shadow-2xl hover:bg-gray-300">
               <CardContent className="p-4 h-full flex flex-col">
                 <div className="flex flex-col gap-4 flex-1">
                   <div className="flex items-center gap-4">
@@ -742,20 +742,20 @@ export function OrganizationsList({
                           }}
                         />
                       ) : (
-                        <span className="text-lg font-medium text-orange-500">
+                        <span className="text-xl font-medium text-orange-500">
                           {getInitials(org.name)}
                         </span>
                       )}
                     </div>
-                    <div className="space-y-1 flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
+                    <div className="space-y-1 flex-1 min-w-0 text-xs">
+                      <p className="text-xs font-medium truncate">
                         {org.name || 'No name'}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {org.email || 'No email'}
                       </p>
                       {org.type && (
-                        <Badge className={`${ORGANIZATION_TYPES[org.type] || 'bg-gray-500'} text-white`}>
+                        <Badge className={`${ORGANIZATION_TYPES[org.type] || 'bg-gray-500'} text-white text-[10px]`}>
                           {org.type}
                         </Badge>
                       )}

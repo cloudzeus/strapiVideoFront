@@ -56,13 +56,13 @@ export function MeetingCard({ meeting, onDelete, onUpdate }) {
 
   return (
     <>
-      <Card>
+      <Card className="shadow-2xl hover:bg-gray-300">
         <CardHeader>
           <div className="flex justify-between items-start">
-            <CardTitle className="text-lg font-semibold">
+            <CardTitle className="text-xs font-semibold">
               {meeting.attributes?.name || meeting.name}
             </CardTitle>
-            <Badge className={getStatusColor(meeting.attributes?.jitsiStatus || meeting.jitsiStatus)}>
+            <Badge className={`${getStatusColor(meeting.attributes?.jitsiStatus || meeting.jitsiStatus)} text-xs`}>
               {meeting.attributes?.jitsiStatus || meeting.jitsiStatus}
             </Badge>
           </div>

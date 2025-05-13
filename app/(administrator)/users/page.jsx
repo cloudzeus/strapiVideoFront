@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, UserPlus, Building2, Phone, MapPin } from "lucide-react"
+import { Search, UserPlus, Building2, Phone, MapPin, Mail } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Pencil, Trash2, Video } from "lucide-react"
@@ -27,15 +27,22 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { AddDepartmentModal } from "@/components/department/add-department-modal"
+import { EditUserModal } from "@/components/user/edit-user-modal"
+import { EditDepartmentModal } from "@/components/department/edit-department-modal"
+import { DeleteDepartmentModal } from "@/components/department/delete-department-modal"
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedUser, setSelectedUser] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [selectedDepartments, setSelectedDepartments] = useState([])
   const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false)
+  const [selectedDepartment, setSelectedDepartment] = useState(null)
+  const [isEditDepartmentModalOpen, setIsEditDepartmentModalOpen] = useState(false)
+  const [isDeleteDepartmentModalOpen, setIsDeleteDepartmentModalOpen] = useState(false)
 
   // Fetch users data with proper error handling
   const {
@@ -392,7 +399,11 @@ export default function UsersPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Button size="sm" className="text-xs">
+              <Button 
+                size="sm" 
+                className="text-xs"
+                onClick={() => setIsAddUserModalOpen(true)}
+              >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Add User
               </Button>
@@ -415,7 +426,7 @@ export default function UsersPage() {
             </TabsList>
             <TabsContent value="users" className="flex-1 overflow-hidden">
               {usersStatus === "error" ? (
-                <div className="text-xs text-red-500">
+                <div className="text-xs">
                   Error loading users: {usersError?.message}
                 </div>
               ) : usersStatus === "loading" ? (
@@ -434,11 +445,13 @@ export default function UsersPage() {
                       const avatarUrl = userData.avatar?.url || null
                       
                       return (
-                        <Card key={user.id} className="h-[280px]">
-                          <CardContent className="p-4 h-full flex flex-col">
-                            <div className="flex flex-col gap-4 flex-1">
-                              <div className="flex items-center gap-4">
-                                <Avatar className="h-10 w-10 bg-black">
+                        
+                        <Card key={user.id} className="h-[280px] hover:bg-gray-300 shadow-2xl hover:border-1">
+                          <CardContent className="p-3 h-full">
+                            <div className="flex gap-4 h-full">
+                              {/* Avatar Section - Left Side */}
+                              <div className="flex items-center pb-[45px]">
+                                <Avatar className="h-[90px] w-[90px] bg-black">
                                   <AvatarImage 
                                     src={avatarUrl}
                                     alt={`${userData.name || ''} ${userData.lastName || ''}`.trim() || userData.email}
@@ -447,112 +460,150 @@ export default function UsersPage() {
                                     {userData.name?.[0]?.toUpperCase() || userData.email?.[0]?.toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
+                              </div>
+
+                              {/* Content Section - Right Side */}
+                              <div className="flex-1 flex flex-col">
+                                {/* User Info */}
                                 <div className="space-y-1">
-                                  <p className="text-xs font-medium">
+                                  <p className="text-sm font-medium uppercase">
                                     {`${userData.name || ''} ${userData.lastName || ''}`.trim() || userData.email}
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {userData.email}
+                                  <p className="text-[10px] font-gray-500 truncate max-w-[45ch]">
+                                    {userData.organization?.name || "No Organization"}
                                   </p>
                                   {userData.jobPosition && (
                                     <Badge className="bg-black text-white text-[10px]">
-                                      {userData.jobPosition}
+                                      {userData.jobPosition} 
                                     </Badge>
                                   )}
+                                  <span className="text-[12px] font-gray-500 truncate max-w-[45ch]">
+                                    {" "+userData.department?.name || "No Department"}
+                                  </span>
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <p className="text-[10px] font-bold truncate max-w-[30ch]">
-                                  {userData.organization?.name || "No Organization"}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {userData.department?.name || "No Department"}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-3 w-3 text-muted-foreground" />
-                                <div className="flex items-center gap-2">
-                                  {userData.phone && (
+
+                                {/* Contact Info */}
+                                <div className="space-y-2 mt-4">
+                                  {/* Phones */}
+                                  {(userData.phone || userData.workPhone || userData.mobilePhone) && (
+                                    <div className="flex items-center gap-2">
+                                      <Phone className="h-3 w-3 text-black" />
+                                      <div className="flex items-center gap-2">
+                                        {userData.phone && (
+                                          <a 
+                                            href={`tel:${userData.phone}`}
+                                            className="text-xs text-muted-foreground hover:text-primary"
+                                          >
+                                            {userData.phone}
+                                          </a>
+                                        )}
+                                        {userData.workPhone && (
+                                          <>
+                                            <p className="text-xs text-muted-foreground">•</p>
+                                            <a 
+                                              href={`tel:${userData.workPhone}`}
+                                              className="text-xs text-muted-foreground hover:text-primary"
+                                            >
+                                              {userData.workPhone}
+                                            </a>
+                                          </>
+                                        )}
+                                        {userData.mobilePhone && (
+                                          <>
+                                            <p className="text-xs text-muted-foreground">•</p>
+                                            <a 
+                                              href={`tel:${userData.mobilePhone}`}
+                                              className="text-xs text-muted-foreground hover:text-primary"
+                                            >
+                                              {userData.mobilePhone}
+                                            </a>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Email */}
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="h-3 w-3 text-black" />
                                     <a 
-                                      href={`tel:${userData.phone}`}
+                                      href={`mailto:${userData.email}`}
                                       className="text-xs text-muted-foreground hover:text-primary"
                                     >
-                                      {userData.phone}
+                                      {userData.email}
                                     </a>
-                                  )}
-                                  {userData.workPhone && (
-                                    <>
-                                      <p className="text-xs text-muted-foreground">•</p>
+                                  </div>
+
+                                  {/* Address */}
+                                  {(userData.address || userData.city || userData.country) && (
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-3 w-3 text-black" />
                                       <a 
-                                        href={`tel:${userData.workPhone}`}
+                                        href={getGoogleMapsUrl(userData.address, userData.city, userData.country)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className="text-xs text-muted-foreground hover:text-primary"
                                       >
-                                        {userData.workPhone}
+                                        {[userData.address, userData.city, userData.country].filter(Boolean).join(', ')}
                                       </a>
-                                    </>
-                                  )}
-                                  {userData.mobilePhone && (
-                                    <>
-                                      <p className="text-xs text-muted-foreground">•</p>
-                                      <a 
-                                        href={`tel:${userData.mobilePhone}`}
-                                        className="text-xs text-muted-foreground hover:text-primary"
-                                      >
-                                        {userData.mobilePhone}
-                                      </a>
-                                    </>
+                                    </div>
                                   )}
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-auto">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-7 w-7 rounded-[8px] bg-gray-900"
-                                        onClick={() => {
-                                          setSelectedUser(user)
-                                          setIsEditModalOpen(true)
-                                        }}
-                                      >
-                                        <Pencil className="h-3 w-3 text-orange-500" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-black text-orange-500 text-xs">
-                                      Edit User
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-[8px] bg-gray-900">
-                                        <Trash2 className="h-3 w-3 text-orange-500" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-black text-orange-500 text-xs">
-                                      Delete User
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-[8px] bg-gray-900">
-                                        <Video className="h-3 w-3 text-orange-500" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-black text-orange-500 text-xs">
-                                      Add to Meeting
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-2 justify-end mt-auto">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-7 w-7 rounded-[8px] bg-gray-900"
+                                          onClick={() => {
+                                            setSelectedUser(user)
+                                            setIsEditModalOpen(true)
+                                          }}
+                                        >
+                                          <Pencil className="h-3 w-3 text-orange-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-black text-orange-500 text-xs">
+                                        Edit User
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-[8px] bg-gray-900">
+                                          <Trash2 className="h-3 w-3 text-orange-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-black text-orange-500 text-xs">
+                                        Delete User
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-[8px] bg-gray-900">
+                                          <Video className="h-3 w-3 text-orange-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-black text-orange-500 text-xs">
+                                        Add to Meeting
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                               </div>
                             </div>
                           </CardContent>
                         </Card>
+
+                        
+                        
                       )
                     })}
                   </div>
@@ -572,16 +623,16 @@ export default function UsersPage() {
                       </span>
                     </div>
                     {org.departments.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
                         {org.departments.map((dept) => (
-                          <Card key={dept.id} className="h-[140px]">
-                            <CardContent className="p-3 h-full flex flex-col">
-                              <div className="flex flex-col gap-2 flex-1">
+                          <Card key={dept.id} className="h-[200px] shadow-2xl hover:bg-gray-300">
+                            <CardContent className="p-3 h-full flex flex-col tracking-wider ">
+                              <div className="flex flex-col gap-1 flex-1">
                                 <div className="space-y-0.5">
-                                  <p className="text-xs font-medium truncate">
+                                  <p className="text-xs font-medium truncate uppercase">
                                     {dept.name}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
+                                  <p className="text-[12px] text-muted-foreground tracking-wider">
                                     {dept.users.length} members
                                   </p>
                                 </div>
@@ -592,12 +643,12 @@ export default function UsersPage() {
                                       <TooltipProvider key={user.id}>
                                         <Tooltip>
                                           <TooltipTrigger asChild>
-                                            <Avatar className="h-6 w-6">
+                                            <Avatar className="h-10 w-10">
                                               <AvatarImage 
                                                 src={user.avatar?.url || null}
                                                 alt={`${user.name || ''} ${user.lastName || ''}`.trim() || user.email}
                                               />
-                                              <AvatarFallback className="text-[10px]">
+                                              <AvatarFallback className="text-[12px] bg-black text-white">
                                                 {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
                                               </AvatarFallback>
                                             </Avatar>
@@ -619,6 +670,10 @@ export default function UsersPage() {
                                           variant="ghost" 
                                           size="icon" 
                                           className="h-6 w-6 rounded-[6px] bg-gray-900"
+                                          onClick={() => {
+                                            setSelectedDepartment(dept)
+                                            setIsEditDepartmentModalOpen(true)
+                                          }}
                                         >
                                           <Pencil className="h-3 w-3 text-orange-500" />
                                         </Button>
@@ -631,7 +686,15 @@ export default function UsersPage() {
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-[6px] bg-gray-900">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 rounded-[6px] bg-gray-900"
+                                          onClick={() => {
+                                            setSelectedDepartment(dept)
+                                            setIsDeleteDepartmentModalOpen(true)
+                                          }}
+                                        >
                                           <Trash2 className="h-3 w-3 text-orange-500" />
                                         </Button>
                                       </TooltipTrigger>
@@ -935,6 +998,39 @@ export default function UsersPage() {
           refetchUsers()
         }}
       />
+
+      {/* Add User Modal */}
+      <EditUserModal
+        open={isAddUserModalOpen}
+        onOpenChange={setIsAddUserModalOpen}
+        onSave={() => {
+          refetchUsers()
+        }}
+      />
+
+      {/* Edit Department Modal */}
+      {selectedDepartment && (
+        <EditDepartmentModal
+          open={isEditDepartmentModalOpen}
+          onOpenChange={setIsEditDepartmentModalOpen}
+          department={selectedDepartment}
+          onSave={() => {
+            refetchUsers()
+          }}
+        />
+      )}
+
+      {/* Delete Department Modal */}
+      {selectedDepartment && (
+        <DeleteDepartmentModal
+          open={isDeleteDepartmentModalOpen}
+          onOpenChange={setIsDeleteDepartmentModalOpen}
+          department={selectedDepartment}
+          onSave={() => {
+            refetchUsers()
+          }}
+        />
+      )}
     </div>
   )
 } 

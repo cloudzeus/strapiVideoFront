@@ -32,6 +32,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { FiUpload } from "react-icons/fi"
 import { toast } from "sonner"
+import { Combobox } from "@/components/ui/combobox"
+import React from "react"
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -57,6 +59,8 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedOrgId, setSelectedOrgId] = useState(user?.organization?.id || "")
   const [departments, setDepartments] = useState([])
+
+  const isEditMode = !!user
 
   console.log('EditModal - User Data:', user)
   console.log('EditModal - Avatar Preview:', {
@@ -97,16 +101,30 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
         }
       )
       const data = await response.json()
-      return data.data
+      console.log('Organizations response:', data) // Debug log
+      return data.data || []
     },
   })
+
+  // Transform organizations data for Combobox
+  const organizationOptions = React.useMemo(() => {
+    if (!organizations) return []
+    return organizations.map(org => {
+      console.log('Organization data:', org) // Debug log
+      return {
+        value: org.id.toString(),
+        label: org.attributes?.name || org.name || 'Unnamed Organization'
+      }
+    })
+  }, [organizations])
 
   // Update departments when organization changes
   useEffect(() => {
     if (selectedOrgId && organizations) {
-      const selectedOrg = organizations.find(org => org.id === selectedOrgId)
+      const selectedOrg = organizations.find(org => org.id.toString() === selectedOrgId)
       if (selectedOrg) {
-        setDepartments(selectedOrg.attributes.departments.data || [])
+        const deptData = selectedOrg.attributes?.departments?.data || selectedOrg.departments || []
+        setDepartments(Array.isArray(deptData) ? deptData : [])
       } else {
         setDepartments([])
       }
@@ -171,8 +189,10 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
         try {
           const formData = new FormData()
           formData.append("files", avatar)
-          formData.append("ref", "plugin::users-permissions.user")
-          formData.append("refId", user.id)
+          if (isEditMode) {
+            formData.append("ref", "plugin::users-permissions.user")
+            formData.append("refId", user.id)
+          }
           formData.append("field", "avatar")
 
           const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/upload`, {
@@ -217,16 +237,12 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
         country: values.country || null,
         zip: values.zip || null,
         jobPosition: values.jobPosition || null,
+        password: values.password, // Always include password for new users
       }
 
       // Add avatar data if it exists
       if (avatarData) {
         dataToSubmit.avatar = avatarData.id
-      }
-
-      // Only include password if it's provided
-      if (values.password) {
-        dataToSubmit.password = values.password
       }
 
       // Only include organization and department if they're provided
@@ -238,8 +254,12 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
       }
 
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/users/${user.id}`, {
-          method: "PUT",
+        const url = isEditMode 
+          ? `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/users/${user.id}`
+          : `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/users`
+        
+        const response = await fetch(url, {
+          method: isEditMode ? "PUT" : "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${localStorage.getItem('token')}`,
@@ -250,7 +270,7 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
         if (!response.ok) {
           const errorText = await response.text()
           console.error('Update error response:', errorText)
-          throw new Error("Failed to update user")
+          throw new Error("Failed to save user")
         }
 
         const responseData = await response.json()
@@ -258,12 +278,12 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
           throw new Error("Invalid response from server")
         }
 
-        toast.success("User updated successfully")
+        toast.success(isEditMode ? "User updated successfully" : "User created successfully")
         onSave()
         onOpenChange(false)
-      } catch (updateError) {
-        console.error('User update error:', updateError)
-        toast.error("Failed to update user. Please try again.")
+      } catch (error) {
+        console.error('User save error:', error)
+        toast.error(error.message || "Failed to save user. Please try again.")
       }
     } catch (error) {
       console.error("Error in form submission:", error)
@@ -277,7 +297,7 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit User" : "Add New User"}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -365,26 +385,19 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Organization</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value)
-                        setSelectedOrgId(value)
-                      }} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select organization" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {organizations?.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            {org.attributes.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Combobox
+                        options={organizationOptions}
+                        value={field.value?.toString()}
+                        onValueChange={(value) => {
+                          console.log('Selected organization value:', value) // Debug log
+                          field.onChange(value)
+                          setSelectedOrgId(value)
+                        }}
+                        placeholder="Select organization"
+                        emptyMessage="No organizations found."
+                      />
+                    </FormControl>
                     <FormMessage className="text-xs" />
                   </FormItem>
                 )}
@@ -397,7 +410,7 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                     <FormLabel className="text-xs">Department</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                      defaultValue={field.value?.toString()}
                       disabled={!selectedOrgId}
                     >
                       <FormControl>
@@ -407,8 +420,8 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                       </FormControl>
                       <SelectContent>
                         {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            {dept.attributes.name}
+                          <SelectItem key={dept.id} value={dept.id.toString()}>
+                            {dept.attributes?.name || dept.name || 'Unnamed Department'}
                           </SelectItem>
                         ))}
                       </SelectContent>
