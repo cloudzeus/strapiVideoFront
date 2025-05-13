@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, UserPlus, Building2, Phone, MapPin, Mail } from "lucide-react"
+import { Search, UserPlus, Building2, Phone, MapPin, Mail, Check, ChevronsUpDown } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Pencil, Trash2, Video } from "lucide-react"
@@ -24,12 +24,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { AddDepartmentModal } from "@/components/department/add-department-modal"
 import { EditUserModal } from "@/components/user/edit-user-modal"
 import { EditDepartmentModal } from "@/components/department/edit-department-modal"
 import { DeleteDepartmentModal } from "@/components/department/delete-department-modal"
+import { OrganizationCombobox } from "@/components/organization/organization-combobox"
+import { DepartmentCombobox } from "@/components/department/department-combobox"
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -43,6 +59,10 @@ export default function UsersPage() {
   const [selectedDepartment, setSelectedDepartment] = useState(null)
   const [isEditDepartmentModalOpen, setIsEditDepartmentModalOpen] = useState(false)
   const [isDeleteDepartmentModalOpen, setIsDeleteDepartmentModalOpen] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState("")
+  const [selectedOrgValue, setSelectedOrgValue] = useState("")
+  const [selectedOrganization, setSelectedOrganization] = useState("")
 
   // Fetch users data with proper error handling
   const {
@@ -120,8 +140,18 @@ export default function UsersPage() {
       }
 
       const data = await response.json()
-      return data.data || []
+      // Transform the data to a simpler structure
+      return data.data.map(org => ({
+        id: org.id,
+        name: org.attributes.name,
+        departments: org.attributes.departments.data.map(dept => ({
+          id: dept.id,
+          name: dept.attributes.name
+        }))
+      }))
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: false
   })
 
   // Fetch roles data
@@ -182,6 +212,37 @@ export default function UsersPage() {
     },
   })
 
+  // Transform organizations data for the combobox
+  const organizationOptions = useMemo(() => {
+    if (!organizationsData) return []
+    return organizationsData.map(org => ({
+      value: org.id.toString(),
+      label: org.name
+    }))
+  }, [organizationsData])
+
+  // Transform departments data for the combobox
+  const departmentOptions = useMemo(() => {
+    if (!selectedOrganization || !organizationsData) return []
+    const org = organizationsData.find(org => org.id.toString() === selectedOrganization)
+    if (!org) return []
+    return org.departments.map(dept => ({
+      value: dept.id.toString(),
+      label: dept.name
+    }))
+  }, [organizationsData, selectedOrganization])
+
+  // Handle organization selection
+  const handleOrganizationChange = (value) => {
+    setSelectedOrganization(value)
+    setSelectedDepartment("") // Reset department when organization changes
+  }
+
+  // Handle department selection
+  const handleDepartmentChange = (value) => {
+    setSelectedDepartment(value)
+  }
+
   // Handle avatar file selection
   const handleAvatarChange = (e) => {
     const file = e.target.files[0]
@@ -222,7 +283,10 @@ export default function UsersPage() {
         userData.mobilePhone,
         userData.address,
         userData.city,
-        userData.country
+        userData.country,
+        userData.organization?.name,
+        userData.department?.name,
+        userData.jobPosition
       ].filter(Boolean)
 
       return searchableFields.some(field => 
@@ -231,23 +295,15 @@ export default function UsersPage() {
     })
   }, [usersData, searchQuery])
 
-  // Handle organization selection
-  const handleOrganizationChange = (value) => {
-    if (!organizationsData) return
-    
-    const selectedOrg = organizationsData.find(org => org.id.toString() === value)
-    if (selectedOrg) {
-      // If the user already has a department, include it in the list
-      const orgDepartments = selectedOrg.departments || []
-      if (selectedUser?.department && !orgDepartments.find(d => d.id === selectedUser.department.id)) {
-        setSelectedDepartments([...orgDepartments, selectedUser.department])
-      } else {
-        setSelectedDepartments(orgDepartments)
-      }
-    } else {
-      setSelectedDepartments([])
-    }
-  }
+  // Filter organizations based on search
+  const filteredOrganizations = useMemo(() => {
+    if (!organizationsData) return []
+    if (!value) return organizationsData
+
+    return organizationsData.filter(org => 
+      org.name.toLowerCase().includes(value.toLowerCase())
+    )
+  }, [organizationsData, value])
 
   // Initialize departments when modal opens
   useEffect(() => {
@@ -812,48 +868,24 @@ export default function UsersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="organization" className="text-xs">Organization</Label>
-                    <Select 
-                      name="organization" 
-                      defaultValue={selectedUser.organization?.id?.toString() || ''}
+                    <Label htmlFor="organization">Organization</Label>
+                    <OrganizationCombobox
+                      organizations={organizationOptions}
+                      value={selectedOrganization}
                       onValueChange={handleOrganizationChange}
-                    >
-                      <SelectTrigger className="text-xs">
-                        <SelectValue placeholder="Select an organization" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {organizationsData?.map((org) => (
-                          <SelectItem key={org.id} value={org.id.toString()} className="text-xs">
-                            <span className="truncate max-w-[200px] block">
-                              {org.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      disabled={orgsStatus === "loading"}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="department" className="text-xs">Department</Label>
-                    <Select 
-                      name="department" 
-                      defaultValue={selectedUser.department?.id?.toString() || ''}
-                      disabled={!selectedUser.organization?.id}
-                    >
-                      <SelectTrigger className="text-xs">
-                        <SelectValue placeholder={selectedUser.organization?.id ? "Select a department" : "Select organization first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {selectedDepartments?.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id.toString()} className="text-xs">
-                            <span className="truncate max-w-[200px] block">
-                              {dept.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="department">Department</Label>
+                    <DepartmentCombobox
+                      departments={departmentOptions}
+                      value={selectedDepartment}
+                      onValueChange={handleDepartmentChange}
+                      disabled={orgsStatus === "loading" || !selectedOrganization}
+                    />
                   </div>
                 </div>
 

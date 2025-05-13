@@ -34,6 +34,8 @@ import { FiUpload } from "react-icons/fi"
 import { toast } from "sonner"
 import { Combobox } from "@/components/ui/combobox"
 import React from "react"
+import { OrganizationCombobox } from "@/components/organization/organization-combobox"
+import { DepartmentCombobox } from "@/components/department/department-combobox"
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -386,16 +388,17 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                   <FormItem>
                     <FormLabel className="text-xs">Organization</FormLabel>
                     <FormControl>
-                      <Combobox
-                        options={organizationOptions}
-                        value={field.value?.toString()}
+                      <OrganizationCombobox
+                        organizations={organizationOptions}
+                        value={field.value}
                         onValueChange={(value) => {
-                          console.log('Selected organization value:', value) // Debug log
+                          console.log('Organization selected:', value) // Debug log
                           field.onChange(value)
                           setSelectedOrgId(value)
+                          // Reset department when organization changes
+                          form.setValue('department', '')
                         }}
-                        placeholder="Select organization"
-                        emptyMessage="No organizations found."
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage className="text-xs" />
@@ -408,24 +411,20 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Department</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value?.toString()}
-                      disabled={!selectedOrgId}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={selectedOrgId ? "Select department" : "Select organization first"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id.toString()}>
-                            {dept.attributes?.name || dept.name || 'Unnamed Department'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <DepartmentCombobox
+                        departments={departments.map(dept => ({
+                          value: dept.id.toString(),
+                          label: dept.attributes?.name || dept.name || 'Unnamed Department'
+                        }))}
+                        value={field.value}
+                        onValueChange={(value) => {
+                          console.log('Department selected:', value) // Debug log
+                          field.onChange(value)
+                        }}
+                        disabled={isSubmitting || !selectedOrgId}
+                      />
+                    </FormControl>
                     <FormMessage className="text-xs" />
                   </FormItem>
                 )}
