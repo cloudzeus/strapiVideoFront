@@ -100,7 +100,8 @@ export function MeetingModal({
       const response = await fetch(`/api/meetings${meeting?.id ? `/${meeting.id}` : ''}`, {
         method: meeting?.id ? 'PUT' : 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(meetingData)
       })

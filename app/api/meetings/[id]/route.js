@@ -99,4 +99,46 @@ export async function PUT(request, { params }) {
       { status: 500 }
     )
   }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    const { id } = params
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+    
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'No authorization token provided' },
+        { status: 401 }
+      )
+    }
+
+    console.log('Deleting meeting:', id)
+
+    const response = await fetch(`${apiUrl}/api/meetings/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': authHeader
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Delete error:', errorData)
+      return NextResponse.json(
+        { error: errorData.error || 'Failed to delete meeting' },
+        { status: response.status }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error in DELETE handler:', error)
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    )
+  }
 } 

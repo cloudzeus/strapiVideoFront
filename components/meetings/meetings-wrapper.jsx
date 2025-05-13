@@ -41,19 +41,28 @@ export function MeetingsWrapper({ initialMeetings = [], initialUsers = [] }) {
 
   const handleDelete = async (meetingId) => {
     try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Authentication required')
+      }
+
       const response = await fetch(`/api/meetings/${meetingId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete meeting')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete meeting')
       }
 
       setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId))
       toast.success("Meeting deleted successfully")
     } catch (error) {
       console.error('Error deleting meeting:', error)
-      toast.error("Failed to delete meeting")
+      toast.error(error.message || "Failed to delete meeting")
       throw error
     }
   }

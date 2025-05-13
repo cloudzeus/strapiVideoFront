@@ -5,6 +5,15 @@ export async function POST(request) {
     const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
     const body = await request.json()
     
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'No authorization token provided' },
+        { status: 401 }
+      )
+    }
+
     console.log('Received request body:', body)
 
     // Format the users array to be just IDs
@@ -29,7 +38,7 @@ export async function POST(request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${body.token}`
+        'Authorization': authHeader
       },
       body: JSON.stringify(requestBody)
     })

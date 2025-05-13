@@ -112,7 +112,15 @@ export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate }) {
                   meeting={meeting}
                   onEdit={() => handleEditMeeting(meeting)}
                   onView={() => {}}
-                  onDelete={() => {}}
+                  onDelete={async () => {
+                    try {
+                      await onMeetingUpdate()
+                      toast.success("Meeting deleted successfully")
+                    } catch (error) {
+                      console.error('Error deleting meeting:', error)
+                      toast.error("Failed to delete meeting")
+                    }
+                  }}
                   onJoin={() => handleJoinMeeting(meeting)}
                 />
               ))
