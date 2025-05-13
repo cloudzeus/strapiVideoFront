@@ -15,10 +15,12 @@ import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { EditUserModal } from "@/components/user/edit-user-modal"
+import { LicenseModal } from "@/components/license/license-modal"
 
 export function AdminHeader({ user }) {
   const router = useRouter()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false)
 
   console.log('AdminHeader - User Data:', user)
   console.log('AdminHeader - Avatar Data:', user?.avatar)
@@ -30,6 +32,11 @@ export function AdminHeader({ user }) {
   const handleEditProfile = (e) => {
     e.preventDefault()
     setIsEditModalOpen(true)
+  }
+
+  const handleLicense = (e) => {
+    e.preventDefault()
+    setIsLicenseModalOpen(true)
   }
 
   return (
@@ -83,6 +90,9 @@ export function AdminHeader({ user }) {
               <DropdownMenuItem onSelect={handleEditProfile}>
                 Edit Profile
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleLicense}>
+                License
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>
                 Log out
               </DropdownMenuItem>
@@ -93,6 +103,10 @@ export function AdminHeader({ user }) {
             onSave={() => router.refresh()} 
             open={isEditModalOpen}
             onOpenChange={setIsEditModalOpen}
+          />
+          <LicenseModal
+            open={isLicenseModalOpen}
+            onOpenChange={setIsLicenseModalOpen}
           />
         </div>
       </div>
