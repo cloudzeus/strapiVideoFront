@@ -1,22 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-
-import { cn } from "@/lib/utils"
+import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
 import {
   Dialog,
   DialogContent,
@@ -32,29 +22,21 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { toast } from "sonner"
+import { OrganizationCombobox } from "@/components/organization/organization-combobox"
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  description: z.string().optional(),
   organization: z.string().min(1, "Please select an organization"),
 })
 
 export function AddDepartmentModal({ open, onOpenChange, onSave }) {
-  const [selectedOrg, setSelectedOrg] = React.useState("")
-  const [openCombobox, setOpenCombobox] = React.useState(false)
-  const [searchQuery, setSearchQuery] = React.useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      description: "",
       organization: "",
     },
   })
@@ -63,66 +45,44 @@ export function AddDepartmentModal({ open, onOpenChange, onSave }) {
   const { data: organizations } = useQuery({
     queryKey: ["organizations"],
     queryFn: async () => {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
-
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/organizations`,
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/organizations?populate=departments`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         }
       )
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch organizations: ${response.status}`)
-      }
-
       const data = await response.json()
       return data.data || []
     },
   })
 
-  // Helper function to get organization name
-  const getOrgName = (org) => {
-    if (!org) return ""
-    return org.attributes?.name || org.name || ""
-  }
-
-  // Filter organizations based on search query
-  const filteredOrganizations = React.useMemo(() => {
+  // Transform organizations data for Combobox
+  const organizationOptions = React.useMemo(() => {
     if (!organizations) return []
-    if (!searchQuery) return organizations
+    return organizations.map(org => ({
+      value: org.id.toString(),
+      label: org.attributes?.name || org.name || 'Unnamed Organization'
+    }))
+  }, [organizations])
 
-    const query = searchQuery.toLowerCase()
-    return organizations.filter((org) => {
-      const name = getOrgName(org).toLowerCase()
-      return name.includes(query)
-    })
-  }, [organizations, searchQuery])
+  async function onSubmit(values) {
+    if (isSubmitting) return
+    setIsSubmitting(true)
 
-  const onSubmit = async (values) => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
-
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/departments`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
           body: JSON.stringify({
             data: {
               name: values.name,
-              description: values.description,
               organization: values.organization,
             },
           }),
@@ -130,93 +90,46 @@ export function AddDepartmentModal({ open, onOpenChange, onSave }) {
       )
 
       if (!response.ok) {
-        throw new Error(`Failed to create department: ${response.status}`)
+        throw new Error("Failed to create department")
       }
 
-      form.reset()
-      onSave?.()
+      toast.success("Department created successfully")
+      onSave()
       onOpenChange(false)
+      form.reset()
     } catch (error) {
       console.error("Error creating department:", error)
+      toast.error(error.message || "Failed to create department")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] w-[95vw]">
         <DialogHeader>
-          <DialogTitle className="text-xs">Add Department</DialogTitle>
+          <DialogTitle className="text-xs">Add New Department</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 w-full">
             <FormField
               control={form.control}
               name="organization"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
+                <FormItem className="w-full">
                   <FormLabel className="text-xs">Organization</FormLabel>
-                  <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={openCombobox}
-                          className={cn(
-                            "w-full justify-between text-[10px]",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value
-                            ? getOrgName(organizations?.find(
-                                (org) => org.id.toString() === field.value
-                              ))
-                            : "Select organization..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search organization..."
-                          className="h-9 text-[10px]"
-                          value={searchQuery}
-                          onValueChange={setSearchQuery}
-                        />
-                        <CommandList>
-                          <CommandEmpty className="text-[10px]">
-                            No organization found.
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {filteredOrganizations.map((org) => (
-                              <CommandItem
-                                key={org.id}
-                                value={org.id.toString()}
-                                onSelect={(value) => {
-                                  form.setValue("organization", value)
-                                  setSelectedOrg(value)
-                                  setOpenCombobox(false)
-                                  setSearchQuery("")
-                                }}
-                                className="text-[10px]"
-                              >
-                                {getOrgName(org)}
-                                <Check
-                                  className={cn(
-                                    "ml-auto h-4 w-4",
-                                    field.value === org.id.toString()
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <OrganizationCombobox
+                      organizations={organizationOptions}
+                      value={field.value}
+                      onValueChange={(value) => {
+                        console.log('Organization selected:', value)
+                        field.onChange(value)
+                      }}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
                   <FormMessage className="text-xs" />
                 </FormItem>
               )}
@@ -226,49 +139,32 @@ export function AddDepartmentModal({ open, onOpenChange, onSave }) {
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="w-full">
                   <FormLabel className="text-xs">Department Name</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Enter department name"
-                      className="text-xs"
-                    />
+                    <Input {...field} className="text-xs w-full" />
                   </FormControl>
                   <FormMessage className="text-xs" />
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Enter department description"
-                      className="text-xs min-h-[100px]"
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-4 w-full">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
                 className="text-xs"
               >
                 Cancel
               </Button>
-              <Button type="submit" className="text-xs">
-                Add Department
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="text-xs"
+              >
+                {isSubmitting ? "Creating..." : "Create Department"}
               </Button>
             </div>
           </form>

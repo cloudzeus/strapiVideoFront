@@ -53,6 +53,9 @@ const formSchema = z.object({
   country: z.string().optional(),
   zip: z.string().optional(),
   avatar: z.any().optional(),
+  role: z.string().min(1, "Role is required"),
+  confirmed: z.boolean().default(true),
+  blocked: z.boolean().default(false),
 })
 
 export function EditUserModal({ user, onSave, open, onOpenChange }) {
@@ -87,6 +90,9 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
       city: user?.city || "",
       country: user?.country || "Greece",
       zip: user?.zip || "",
+      role: user?.role?.id?.toString() || "",
+      confirmed: user?.confirmed ?? true,
+      blocked: user?.blocked ?? false,
     },
   })
 
@@ -134,6 +140,23 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
       setDepartments([])
     }
   }, [selectedOrgId, organizations])
+
+  // Fetch roles
+  const { data: roles } = useQuery({
+    queryKey: ["roles"],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/roles`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      const data = await response.json()
+      return data.roles || []
+    },
+  })
 
   // List of countries
   const countries = [
@@ -185,111 +208,76 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
     setIsSubmitting(true)
 
     try {
-      let avatarData = null
-
+      // If there's a new avatar, upload it first
+      let avatarId = null
       if (avatar) {
-        try {
-          const formData = new FormData()
-          formData.append("files", avatar)
-          if (isEditMode) {
-            formData.append("ref", "plugin::users-permissions.user")
-            formData.append("refId", user.id)
-          }
-          formData.append("field", "avatar")
-
-          const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/upload`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${localStorage.getItem('token')}`,
-            },
-            body: formData,
-          })
-          
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text()
-            console.error('Upload error response:', errorText)
-            throw new Error("Failed to upload avatar")
-          }
-          
-          const uploadData = await uploadResponse.json()
-          if (!Array.isArray(uploadData) || uploadData.length === 0) {
-            throw new Error("Invalid upload response")
-          }
-          avatarData = uploadData[0]
-          // Update preview with the new avatar URL
-          setPreview(avatarData.url || null)
-        } catch (uploadError) {
-          console.error('Avatar upload error:', uploadError)
-          toast.error("Failed to upload avatar. Please try again.")
-          return
-        }
-      }
-
-      // Prepare data for Strapi
-      const dataToSubmit = {
-        username: values.email,
-        email: values.email,
-        name: values.name,
-        lastName: values.lastName,
-        phone: values.phone || null,
-        workPhone: values.workPhone || null,
-        mobile: values.mobile || null,
-        address: values.address || null,
-        city: values.city || null,
-        country: values.country || null,
-        zip: values.zip || null,
-        jobPosition: values.jobPosition || null,
-        password: values.password, // Always include password for new users
-      }
-
-      // Add avatar data if it exists
-      if (avatarData) {
-        dataToSubmit.avatar = avatarData.id
-      }
-
-      // Only include organization and department if they're provided
-      if (values.organization) {
-        dataToSubmit.organization = values.organization
-      }
-      if (values.department) {
-        dataToSubmit.department = values.department
-      }
-
-      try {
-        const url = isEditMode 
-          ? `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/users/${user.id}`
-          : `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users-permissions/users`
+        const formDataAvatar = new FormData()
+        formDataAvatar.append('files', avatar)
         
-        const response = await fetch(url, {
-          method: isEditMode ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify(dataToSubmit),
-        })
+        const uploadResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/upload`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+            body: formDataAvatar,
+          }
+        )
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('Update error response:', errorText)
-          throw new Error("Failed to save user")
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload avatar: ${uploadResponse.status}`)
         }
 
-        const responseData = await response.json()
-        if (!responseData) {
-          throw new Error("Invalid response from server")
-        }
-
-        toast.success(isEditMode ? "User updated successfully" : "User created successfully")
-        onSave()
-        onOpenChange(false)
-      } catch (error) {
-        console.error('User save error:', error)
-        toast.error(error.message || "Failed to save user. Please try again.")
+        const uploadData = await uploadResponse.json()
+        avatarId = uploadData[0].id
       }
+
+      // Create the user
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            email: values.email,
+            username: values.email, // Strapi requires a username
+            password: values.password,
+            name: values.name,
+            lastName: values.lastName,
+            jobPosition: values.jobPosition,
+            phone: values.phone,
+            workPhone: values.workPhone,
+            mobilePhone: values.mobile,
+            address: values.address,
+            city: values.city,
+            zip: values.zip,
+            country: values.country,
+            role: values.role,
+            department: values.department,
+            organization: values.organization,
+            confirmed: values.confirmed,
+            blocked: values.blocked,
+            avatar: avatarId,
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error?.message || 'Failed to save user')
+      }
+
+      toast.success("User created successfully")
+      onSave()
+      onOpenChange(false)
+      form.reset()
     } catch (error) {
-      console.error("Error in form submission:", error)
-      toast.error(error.message || "An unexpected error occurred")
+      console.error("Error saving user:", error)
+      toast.error(error.message || "Failed to save user")
     } finally {
       setIsSubmitting(false)
     }
@@ -552,6 +540,71 @@ export function EditUserModal({ user, onSave, open, onOpenChange }) {
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {roles?.map((role) => (
+                          <SelectItem key={role.id} value={role.id.toString()}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="confirmed"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-xs">Confirmed</FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="blocked"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-xs">Blocked</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-4">

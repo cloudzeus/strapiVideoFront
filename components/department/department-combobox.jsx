@@ -44,7 +44,7 @@ export function DepartmentCombobox({ departments, value, onValueChange, disabled
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between cursor-pointer"
+          className="w-full justify-between cursor-pointer text-[10px]"
           disabled={disabled}
         >
           {value
@@ -62,14 +62,15 @@ export function DepartmentCombobox({ departments, value, onValueChange, disabled
               console.log('Search value changed:', value)
               setSearchValue(value)
             }}
+            className="text-[10px]"
           />
-          <CommandEmpty>No department found.</CommandEmpty>
+          <CommandEmpty className="text-[10px]">No department found.</CommandEmpty>
           <CommandGroup>
             {filteredDepartments.map((dept) => (
               <div
                 key={dept.value}
                 onClick={() => handleSelect(dept)}
-                className="flex items-center justify-between px-2 py-1.5 text-sm cursor-pointer hover:bg-black hover:text-white transition-colors"
+                className="flex items-center justify-between px-2 py-1.5 text-[10px] cursor-pointer hover:bg-black hover:text-white transition-colors"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {

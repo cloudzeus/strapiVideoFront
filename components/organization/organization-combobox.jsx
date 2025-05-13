@@ -44,7 +44,7 @@ export function OrganizationCombobox({ organizations, value, onValueChange, disa
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between cursor-pointer"
+          className="w-full justify-between cursor-pointer text-[10px]"
           disabled={disabled}
         >
           {value
@@ -62,14 +62,15 @@ export function OrganizationCombobox({ organizations, value, onValueChange, disa
               console.log('Search value changed:', value)
               setSearchValue(value)
             }}
+            className="text-[10px]"
           />
-          <CommandEmpty>No organization found.</CommandEmpty>
+          <CommandEmpty className="text-[10px]">No organization found.</CommandEmpty>
           <CommandGroup>
             {filteredOrganizations.map((org) => (
               <div
                 key={org.value}
                 onClick={() => handleSelect(org)}
-                className="flex items-center justify-between px-2 py-1.5 text-sm cursor-pointer hover:bg-black hover:text-white transition-colors"
+                className="flex items-center justify-between px-2 py-1.5 text-[10px] cursor-pointer hover:bg-black hover:text-white transition-colors"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
