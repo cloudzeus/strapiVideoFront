@@ -40,16 +40,7 @@ const navigation = [
     href: "/meetings",
     icon: Calendar,
   },
-  {
-    name: "Analytics",
-    href: "/admin-dashboard/analytics",
-    icon: BarChart,
-  },
-  {
-    name: "Settings",
-    href: "/admin-dashboard/settings",
-    icon: Settings,
-  },
+
 ]
 
 export function AdminSidebar() {

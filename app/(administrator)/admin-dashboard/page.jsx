@@ -182,7 +182,7 @@ export default function AdminDashboard() {
                 <div key={user.id} className="rounded-lg border bg-card p-4 shadow-xl hover:shadow-2xl transition-all hover:bg-gray-50">
                   <div className="flex flex-col mb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1">{user.username || user.email || 'Unnamed User'}</h4>
+                      <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1 uppercase">{user.username || user.email || 'Unnamed User'}</h4>
                       <span className="text-[10px] bg-black text-white px-2 py-1 rounded-full whitespace-nowrap">
                         {formatDate(user.createdAt)}
                       </span>
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
                 <div key={org.id} className="rounded-lg border bg-card p-4 shadow-xl hover:shadow-2xl transition-all hover:bg-gray-50">
                   <div className="flex flex-col mb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1">{org.name || 'Unnamed Organization'}</h4>
+                      <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1 uppercase">{org.name || 'Unnamed Organization'}</h4>
                       <span className="text-[10px] bg-black text-white px-2 py-1 rounded-full whitespace-nowrap">
                         {formatDate(org.createdAt)}
                       </span>

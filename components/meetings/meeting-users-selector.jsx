@@ -16,7 +16,7 @@ export function MeetingUsersSelector({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+        const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
         const token = localStorage.getItem('token')
 
         if (!token) {

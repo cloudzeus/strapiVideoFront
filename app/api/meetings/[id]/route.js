@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = await params
+    const { id } = params
     
     console.log('Meeting ID from params:', id)
     
@@ -14,8 +14,8 @@ export async function PUT(request, { params }) {
     const body = await request.json()
     
     // Step 1: Fetch current meeting data to get existing users
-    const strapiUrl = process.env.STRAPI_URL || 'http://localhost:1337'
-    const currentMeetingUrl = `${strapiUrl}/api/meetings/${id}?populate=users`
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
+    const currentMeetingUrl = `${apiUrl}/api/meetings/${id}?populate=users`
     
     const currentMeetingResponse = await fetch(currentMeetingUrl, {
       headers: {
@@ -56,7 +56,7 @@ export async function PUT(request, { params }) {
     })
 
     // Step 3: Update the meeting
-    const updateUrl = `${strapiUrl}/api/meetings/${id}/custom?populate=users`
+    const updateUrl = `${apiUrl}/api/meetings/${id}/custom?populate=users`
     
     console.log('Using custom update URL:', updateUrl)
     
@@ -82,7 +82,7 @@ export async function PUT(request, { params }) {
         console.log('Update error text:', errorText)
       }
       
-      return Response.json(
+      return NextResponse.json(
         { error: 'Failed to update meeting', details: errorText },
         { status: updateResponse.status }
       )
@@ -91,10 +91,10 @@ export async function PUT(request, { params }) {
     const data = await updateResponse.json()
     console.log('Update successful with data:', JSON.stringify(data, null, 2))
     
-    return Response.json(data)
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error in PUT handler:', error)
-    return Response.json(
+    return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
     )
@@ -103,11 +103,10 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = await params
-    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
-    
-    // Get the authorization header
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
+    const { id } = params
     const authHeader = request.headers.get('authorization')
+
     if (!authHeader) {
       return NextResponse.json(
         { error: 'No authorization token provided' },
@@ -120,24 +119,26 @@ export async function DELETE(request, { params }) {
     const response = await fetch(`${apiUrl}/api/meetings/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': authHeader
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
       }
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('Delete error:', errorData)
+      console.error('Delete API Error:', errorData)
       return NextResponse.json(
-        { error: errorData.error || 'Failed to delete meeting' },
+        { error: errorData.error?.message || 'Failed to delete meeting' },
         { status: response.status }
       )
     }
 
-    return NextResponse.json({ success: true })
+    const data = await response.json()
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error in DELETE handler:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     )
   }

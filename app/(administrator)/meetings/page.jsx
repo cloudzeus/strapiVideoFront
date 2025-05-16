@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic'
+
 import { cookies } from 'next/headers'
 import { MeetingsWrapper } from '@/components/meetings/meetings-wrapper'
 
 async function getMeetings() {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || 'http://localhost:1337'
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
     const cookieStore = await cookies()
     const token = cookieStore.get('token')?.value
 

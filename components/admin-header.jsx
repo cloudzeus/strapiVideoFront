@@ -42,7 +42,7 @@ export function AdminHeader({ user }) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">
       <div className="flex h-14 items-center px-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 left-4">
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
           </Button>
