@@ -2,71 +2,35 @@
 
 import { useState } from "react"
 import { format } from "date-fns"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Pencil, Trash2, Video } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MeetingModal } from "./meeting-modal"
-import { toast } from "sonner"
-import { Pencil, Trash2, Video, User, Calendar, Users } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useRouter } from "next/navigation"
 
-export function MeetingCard({ meeting, onDelete, onUpdate, session }) {
-  const router = useRouter()
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+export function MeetingCard({ meeting, onEdit, onDelete, disabled }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'scheduled':
-        return 'bg-blue-500'
-      case 'in_progress':
-        return 'bg-green-500'
+        return 'bg-blue-100 text-blue-800'
+      case 'in-progress':
+        return 'bg-green-100 text-green-800'
       case 'completed':
-        return 'bg-gray-500'
-      case 'cancelled':
-        return 'bg-red-500'
+        return 'bg-gray-100 text-gray-800'
       default:
-        return 'bg-gray-500'
+        return 'bg-gray-100 text-gray-800'
     }
   }
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this meeting?")) {
-      return
-    }
-
-    setLoading(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
-      const response = await fetch(`${apiUrl}/api/meetings/${meeting.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.token}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete meeting')
-      }
-
-      toast.success("Meeting deleted successfully")
-      router.refresh()
+      await onDelete()
+      setIsDeleteDialogOpen(false)
     } catch (error) {
       console.error('Error deleting meeting:', error)
-      toast.error("Failed to delete meeting")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -76,69 +40,73 @@ export function MeetingCard({ meeting, onDelete, onUpdate, session }) {
 
   return (
     <>
-      <Card className="shadow-2xl hover:bg-gray-300">
+      <Card className="w-full">
         <CardHeader>
           <div className="flex justify-between items-start">
-            <CardTitle className="text-xs font-semibold">
-              {meeting.attributes?.name || meeting.name}
-            </CardTitle>
-            <Badge className={`${getStatusColor(meeting.attributes?.jitsiStatus || meeting.jitsiStatus)} text-xs`}>
-              {meeting.attributes?.jitsiStatus || meeting.jitsiStatus}
-            </Badge>
+            <CardTitle className="text-xl">{meeting.attributes?.name}</CardTitle>
+            <span className={`px-2 py-1 rounded-full text-sm ${getStatusColor(meeting.attributes?.status)}`}>
+              {meeting.attributes?.status || 'scheduled'}
+            </span>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4">
-            {meeting.attributes?.description || meeting.description}
-          </p>
           <div className="space-y-2">
-            <div className="flex items-center text-sm">
-              <Calendar className="h-4 w-4 mr-2" />
-              <span>
-                {format(new Date(meeting.attributes?.startTime || meeting.startTime), "PPP HH:mm")} -{" "}
-                {format(new Date(meeting.attributes?.endTime || meeting.endTime), "HH:mm")}
-              </span>
-            </div>
-            <div className="flex items-center text-sm">
-              <Users className="h-4 w-4 mr-2" />
-              <span>
-                {(meeting.attributes?.users?.data?.length || meeting.users?.length || 0)} Participants
-              </span>
+            <p className="text-gray-600">{meeting.attributes?.description}</p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-medium">Start Time</p>
+                <p className="text-gray-600">
+                  {format(new Date(meeting.attributes?.startTime), 'PPp')}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">End Time</p>
+                <p className="text-gray-600">
+                  {format(new Date(meeting.attributes?.endTime), 'PPp')}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Room</p>
+                <p className="text-gray-600">{meeting.attributes?.roomName}</p>
+              </div>
+              <div>
+                <p className="font-medium">Recurring</p>
+                <p className="text-gray-600">
+                  {meeting.attributes?.isRecurring ? 'Yes' : 'No'}
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <div className="flex space-x-2">
-            <Button
-              className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
-              size="icon"
-              onClick={() => setIsEditModalOpen(true)}
-              disabled={loading}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
-              size="icon"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              disabled={loading}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button onClick={handleJoin} disabled={loading}>
-            <Video className="h-4 w-4 mr-2" />
-            Join Meeting
+        <CardFooter className="flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(meeting)}
+            disabled={disabled}
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={disabled}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleJoin}
+            disabled={disabled}
+          >
+            <Video className="w-4 h-4 mr-2" />
+            Join
           </Button>
         </CardFooter>
       </Card>
-
-      <MeetingModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        meeting={meeting}
-        onSave={onUpdate}
-      />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

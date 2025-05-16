@@ -26,45 +26,33 @@ export function MeetingModal({
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    startTime: new Date(),
-    endTime: new Date(),
+    startTime: "",
+    endTime: "",
     roomName: "",
     isRecurring: false,
     users: []
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const router = useRouter()
 
   useEffect(() => {
     if (meeting) {
-      // Safely parse dates
-      const startTime = meeting.attributes?.startTime ? 
-        new Date(meeting.attributes.startTime) : new Date()
-      const endTime = meeting.attributes?.endTime ? 
-        new Date(meeting.attributes.endTime) : new Date()
-
-      // Get users data in the correct format
-      const users = meeting.attributes?.users?.data?.map(user => user.id) || 
-                   meeting.users?.data?.map(user => user.id) ||
-                   meeting.users?.map(user => user.id) || []
-
       setFormData({
         name: meeting.attributes?.name || meeting.name || "",
         description: meeting.attributes?.description || meeting.description || "",
-        startTime: startTime,
-        endTime: endTime,
+        startTime: meeting.attributes?.startTime || meeting.startTime || "",
+        endTime: meeting.attributes?.endTime || meeting.endTime || "",
         roomName: meeting.attributes?.roomName || meeting.roomName || "",
         isRecurring: meeting.attributes?.isRecurring || meeting.isRecurring || false,
-        users: users
+        users: meeting.attributes?.users?.data?.map(user => user.id) || 
+               meeting.users?.data?.map(user => user.id) ||
+               meeting.users?.map(user => user.id) || []
       })
     } else {
-      // Reset form for new meeting
       setFormData({
         name: "",
         description: "",
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: "",
+        endTime: "",
         roomName: "",
         isRecurring: false,
         users: []
@@ -75,68 +63,29 @@ export function MeetingModal({
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
-    setError(null)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
-      const url = meeting 
-        ? `${apiUrl}/api/meetings/${meeting.id}`
-        : `${apiUrl}/api/meetings`
-
       // Validate required fields
       if (!formData.name || !formData.startTime || !formData.endTime) {
         throw new Error('Please fill in all required fields')
       }
 
-      // Create meeting data object
-      const meetingData = {
-        data: {
-          name: formData.name,
-          description: formData.description,
-          startTime: formData.startTime.toISOString(),
-          endTime: formData.endTime.toISOString(),
-          roomName: formData.roomName || `meeting-${Date.now()}`,
-          isRecurring: formData.isRecurring,
-          jitsiStatus: 'scheduled',
-          users: formData.users.map(id => parseInt(id))
-        }
+      // Validate dates
+      const startTime = new Date(formData.startTime)
+      const endTime = new Date(formData.endTime)
+      
+      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+        throw new Error('Invalid date format')
       }
 
-      console.log('Sending meeting data:', JSON.stringify(meetingData, null, 2))
-
-      const response = await fetch(url, {
-        method: meeting ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.token}`
-        },
-        body: JSON.stringify(meetingData)
-      })
-
-      const responseData = await response.json()
-
-      if (!response.ok) {
-        console.error('API Error:', {
-          status: response.status,
-          data: responseData
-        })
-        throw new Error(responseData.error || `Failed to save meeting: ${response.status}`)
+      if (endTime <= startTime) {
+        throw new Error('End time must be after start time')
       }
 
-      if (!responseData.data) {
-        throw new Error('Invalid response format from server')
-      }
-
-      console.log('Meeting saved successfully:', responseData)
-
-      // Pass the full response data to the parent component
-      onSave(responseData)
+      await onSave(formData)
       onOpenChange(false)
-      toast.success("Meeting saved successfully")
     } catch (error) {
-      console.error('Error saving meeting:', error)
-      setError(error.message)
-      toast.error(error.message || 'Failed to save meeting')
+      toast.error(error.message || "Failed to save meeting")
     } finally {
       setIsLoading(false)
     }
@@ -146,13 +95,13 @@ export function MeetingModal({
     setFormData(prev => {
       const newData = { ...prev }
       if (field === 'startTime') {
-        newData.startTime = date
+        newData.startTime = date.toISOString()
         // If end time is before start time, update it
-        if (newData.endTime < date) {
+        if (newData.endTime && newData.endTime < date) {
           newData.endTime = new Date(date.getTime() + 60 * 60 * 1000) // Add 1 hour
         }
       } else {
-        newData.endTime = date
+        newData.endTime = date.toISOString()
       }
       return newData
     })
@@ -167,20 +116,18 @@ export function MeetingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{meeting?.id ? "Edit Meeting" : "Add New Meeting"}</DialogTitle>
+          <DialogTitle>{meeting ? "Edit Meeting" : "Create Meeting"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Meeting Name</Label>
+            <Label htmlFor="name">Meeting Name *</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               required
-              disabled={isLoading}
-              placeholder="Enter meeting name"
             />
           </div>
 
@@ -190,96 +137,31 @@ export function MeetingModal({
               id="description"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              required
-              disabled={isLoading}
-              placeholder="Enter meeting description"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Start Time</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.startTime && "text-muted-foreground"
-                  )}
-                  disabled={isLoading}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.startTime ? (
-                    format(formData.startTime, "PPP HH:mm")
-                  ) : (
-                    <span>Pick a date</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={formData.startTime}
-                  onSelect={(date) => handleDateChange(date, 'startTime')}
-                  initialFocus
-                />
-                <div className="p-3 border-t">
-                  <Input
-                    type="time"
-                    value={format(formData.startTime, "HH:mm")}
-                    onChange={(e) => {
-                      const [hours, minutes] = e.target.value.split(":")
-                      const newDate = new Date(formData.startTime)
-                      newDate.setHours(parseInt(hours), parseInt(minutes))
-                      handleDateChange(newDate, 'startTime')
-                    }}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startTime">Start Time *</Label>
+              <Input
+                id="startTime"
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>End Time</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.endTime && "text-muted-foreground"
-                  )}
-                  disabled={isLoading}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.endTime ? (
-                    format(formData.endTime, "PPP HH:mm")
-                  ) : (
-                    <span>Pick a date</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={formData.endTime}
-                  onSelect={(date) => handleDateChange(date, 'endTime')}
-                  initialFocus
-                />
-                <div className="p-3 border-t">
-                  <Input
-                    type="time"
-                    value={format(formData.endTime, "HH:mm")}
-                    onChange={(e) => {
-                      const [hours, minutes] = e.target.value.split(":")
-                      const newDate = new Date(formData.endTime)
-                      newDate.setHours(parseInt(hours), parseInt(minutes))
-                      handleDateChange(newDate, 'endTime')
-                    }}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
+            <div className="space-y-2">
+              <Label htmlFor="endTime">End Time *</Label>
+              <Input
+                id="endTime"
+                type="datetime-local"
+                value={formData.endTime}
+                onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                required
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -304,29 +186,19 @@ export function MeetingModal({
           <MeetingUsersSelector
             meeting={meeting}
             onUsersChange={handleUsersChange}
-            disabled={isLoading}
           />
 
-          {error && (
-            <div className="text-sm text-red-500">
-              {error}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button 
-              type="submit"
-              disabled={isLoading || !formData.name.trim() || !formData.startTime || !formData.endTime}
-            >
-              {isLoading ? "Saving..." : meeting?.id ? "Save Changes" : "Create Meeting"}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Saving..." : meeting ? "Update" : "Create"}
             </Button>
           </div>
         </form>
