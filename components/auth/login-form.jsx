@@ -121,6 +121,7 @@ export function LoginForm() {
             <SubmitButton />
           </div>
         </form>
+        <div className="text-sm text-gray-600">Licensed to {process.env.NEXT_PUBLIC_BUYER_NAME}</div>
       </div>
     </div>
   )
