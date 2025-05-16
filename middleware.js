@@ -1,37 +1,51 @@
 import { NextResponse } from 'next/server'
 
-export function middleware(request) {
+export async function middleware(request) {
   const token = request.cookies.get('token')?.value
-  const userData = request.cookies.get('userData')?.value
-
-  // Get the pathname of the request
+  const userData = request.cookies.get('user')?.value
   const path = request.nextUrl.pathname
 
-  // If the user is not logged in and trying to access a protected route
-  if (!token && !path.startsWith('/login')) {
+  console.log('Middleware - Path:', path)
+  console.log('Middleware - Token exists:', !!token)
+  console.log('Middleware - UserData exists:', !!userData)
+
+  // Allow access to login page and public assets
+  if (path === '/login' || path.startsWith('/_next') || path.startsWith('/api/auth')) {
+    return NextResponse.next()
+  }
+
+  // For all other routes, require authentication
+  if (!token || !userData) {
+    console.log('Middleware - Missing token or user data, redirecting to login')
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // If the user is logged in and trying to access the login page
-  if (token && path === '/login') {
+  // For protected routes, check role
+  if (path.startsWith('/admin-')) {
     try {
-      const user = userData ? JSON.parse(userData) : null
-      const userRole = user?.role?.name
-
-      // If user is an admin, redirect to admin dashboard
-      if (userRole === 'Administrator') {
-        return NextResponse.redirect(new URL('/admin-dashboard', request.url))
+      const user = JSON.parse(userData)
+      if (user.role !== 'Administrator') {
+        console.log('Middleware - Non-admin user accessing admin route, redirecting to dashboard')
+        return NextResponse.redirect(new URL('/dashboard', request.url))
       }
-
-      // For non-admin users, redirect to their dashboard
-      return NextResponse.redirect(new URL('/dashboard', request.url))
     } catch (error) {
-      // If there's an error parsing userData, clear the cookies and redirect to login
+      console.error('Middleware - Error checking admin access:', error)
       const response = NextResponse.redirect(new URL('/login', request.url))
       response.cookies.delete('token')
-      response.cookies.delete('userData')
+      response.cookies.delete('user')
       return response
     }
+  }
+
+  // Add token to API requests
+  if (path.startsWith('/api/')) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('Authorization', `Bearer ${token}`)
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
   }
 
   return NextResponse.next()
@@ -42,12 +56,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
   ],
 } 

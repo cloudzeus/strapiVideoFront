@@ -1,154 +1,144 @@
 "use server"
 
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 export async function login(formData) {
   const email = formData.get("email")
   const password = formData.get("password")
 
+  if (!email || !password) {
+    throw new Error("Email and password are required")
+  }
+
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/auth/local`, {
+    const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
+    
+    // Get JWT token
+    const response = await fetch(`${apiUrl}/api/auth/local`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         identifier: email,
-        password: password,
+        password,
       }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error?.message || "Failed to login")
+      const error = await response.json()
+      throw new Error(error.error?.message || "Failed to login")
     }
 
-    // Store the token
-    const cookieStore = await cookies()
-    cookieStore.set("token", data.jwt, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-    })
+    const data = await response.json()
+    console.log("Login response:", data)
 
-    // Fetch user data
-    const userResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users/me?populate[role][populate]=*&populate[avatar][populate]=*`,
-      {
-        headers: {
-          Authorization: `Bearer ${data.jwt}`,
-        },
-      }
-    )
+    if (!data.jwt) {
+      throw new Error("No JWT token received")
+    }
+
+    // Get user data
+    const userResponse = await fetch(`${apiUrl}/api/users/me?populate[role][populate]=*`, {
+      headers: {
+        Authorization: `Bearer ${data.jwt}`,
+      },
+    })
 
     if (!userResponse.ok) {
       throw new Error("Failed to fetch user data")
     }
 
     const userData = await userResponse.json()
-    console.log('Login - User Data:', userData)
+    console.log("User data fetched:", userData)
 
-    if (!userData.role) {
-      throw new Error("User has no role assigned")
-    }
-
-    // Store user data
-    cookieStore.set("userData", JSON.stringify(userData), {
+    // Set cookies
+    const cookieStore = await cookies()
+    
+    // Set the JWT token in an HTTP-only cookie
+    await cookieStore.set("token", data.jwt, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: "/",
     })
 
-    // Return redirect path based on role
-    switch (userData.role.name) {
-      case "Administrator":
-        return { redirect: "/admin-dashboard" }
-      case "Employee":
-        return { redirect: "/employee/dashboard" }
-      case "Collaborator":
-        return { redirect: "/collaborator/dashboard" }
-      default:
-        throw new Error("Unknown role")
+    // Set user data in a separate cookie
+    await cookieStore.set("user", JSON.stringify({
+      id: userData.id,
+      email: userData.email,
+      role: userData.role.name
+    }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    })
+
+    // Return success response with redirect path
+    return {
+      success: true,
+      redirect: userData.role.name === "Administrator" ? "/admin-dashboard" : "/dashboard"
     }
   } catch (error) {
-    return { error: error.message }
+    console.error("Login error:", error)
+    throw error
   }
 }
 
 export async function logout() {
   try {
     const cookieStore = await cookies()
-    
-    // Clear both cookies
-    cookieStore.delete("token")
-    cookieStore.delete("userData")
-    
-    // Return redirect to login page
-    return { redirect: "/login" }
+    await cookieStore.delete("token")
+    await cookieStore.delete("user")
+    return { success: true, redirect: "/login" }
   } catch (error) {
     console.error("Logout error:", error)
-    return { error: "Failed to logout" }
+    throw error
   }
 }
 
 export async function getSession() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get("token")?.value
-  const userData = cookieStore.get("userData")?.value
-
-  if (!token || !userData) {
-    return null
-  }
-
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users/me?populate[role][populate]=*&populate[avatar][populate]=*`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const cookieStore = await cookies()
+    const token = await cookieStore.get("token")?.value
+    const userData = await cookieStore.get("user")?.value
 
-    if (!response.ok) {
-      throw new Error("Invalid session")
+    if (!token || !userData) {
+      return null
     }
 
-    const sessionData = await response.json()
-    console.log('getSession - User Data:', sessionData)
-
-    return {
-      token,
-      user: sessionData,
+    try {
+      const user = JSON.parse(userData)
+      return {
+        token,
+        user
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error)
+      return null
     }
   } catch (error) {
+    console.error("Session error:", error)
     return null
   }
 }
 
 export async function requireAuth() {
   const session = await getSession()
-  
   if (!session) {
-    return { redirect: "/login" }
+    redirect("/login")
   }
-
   return session
 }
 
 export async function requireAdmin() {
-  const session = await requireAuth()
-  
-  // Check if session and user exist
-  if (!session?.user) {
-    return { redirect: "/login" }
+  const session = await getSession()
+  if (!session) {
+    redirect("/login")
   }
-
-  // Safely check the role
-  const userRole = session.user?.role?.name
-  if (userRole !== "Administrator") {
-    return { redirect: "/login" }
+  if (session.user.role !== "Administrator") {
+    redirect("/dashboard")
   }
-
   return session
 } 

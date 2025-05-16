@@ -20,10 +20,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useRouter } from "next/navigation"
 
-export function MeetingCard({ meeting, onDelete, onUpdate }) {
+export function MeetingCard({ meeting, onDelete, onUpdate, session }) {
   const router = useRouter()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -41,12 +42,31 @@ export function MeetingCard({ meeting, onDelete, onUpdate }) {
   }
 
   const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this meeting?")) {
+      return
+    }
+
+    setLoading(true)
     try {
-      await onDelete(meeting.id)
+      const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
+      const response = await fetch(`${apiUrl}/api/meetings/${meeting.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete meeting')
+      }
+
       toast.success("Meeting deleted successfully")
+      router.refresh()
     } catch (error) {
       console.error('Error deleting meeting:', error)
       toast.error("Failed to delete meeting")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -93,6 +113,7 @@ export function MeetingCard({ meeting, onDelete, onUpdate }) {
               className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
               size="icon"
               onClick={() => setIsEditModalOpen(true)}
+              disabled={loading}
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -100,11 +121,12 @@ export function MeetingCard({ meeting, onDelete, onUpdate }) {
               className="bg-orange-500 text-black hover:bg-orange-600 hover:text-white"
               size="icon"
               onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={loading}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={handleJoin}>
+          <Button onClick={handleJoin} disabled={loading}>
             <Video className="h-4 w-4 mr-2" />
             Join Meeting
           </Button>

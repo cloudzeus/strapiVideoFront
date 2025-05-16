@@ -8,21 +8,13 @@ import { Plus, Search } from "lucide-react"
 import { MeetingCard } from "@/components/meetings/meeting-card"
 import { MeetingModal } from "@/components/meetings/meeting-modal"
 import { toast } from "sonner"
-import { getToken } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 
-export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate }) {
+export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate, session }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedMeeting, setSelectedMeeting] = useState(null)
   const router = useRouter()
-
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-    }
-  }, [router])
 
   useEffect(() => {
     console.log('MeetingsClient - Received meetings:', meetings)
@@ -63,110 +55,71 @@ export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate }) {
     })
   }
 
-  const scheduledMeetings = filterMeetings(meetings, 'scheduled')
-  const pastMeetings = filterMeetings(meetings, 'past')
-
-  console.log('Filtered meetings:', {
-    all: meetings,
-    scheduled: scheduledMeetings,
-    past: pastMeetings
-  })
-
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Meetings</h1>
-        <Button onClick={() => {
-          setSelectedMeeting(null)
-          setIsAddModalOpen(true)
-        }}>Add New Meeting</Button>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Meetings</h1>
+        <Button onClick={() => setIsAddModalOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Meeting
+        </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search meetings..."
-          className="pl-8"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search meetings..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
       </div>
 
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs defaultValue="all" className="w-full">
         <TabsList>
-          <TabsTrigger value="all">All Meetings</TabsTrigger>
+          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
           <TabsTrigger value="past">Past</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {!meetings || meetings.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                No meetings found
-              </div>
-            ) : (
-              meetings.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  onEdit={() => handleEditMeeting(meeting)}
-                  onView={() => {}}
-                  onDelete={async () => {
-                    try {
-                      await onMeetingUpdate()
-                      toast.success("Meeting deleted successfully")
-                    } catch (error) {
-                      console.error('Error deleting meeting:', error)
-                      toast.error("Failed to delete meeting")
-                    }
-                  }}
-                  onJoin={() => handleJoinMeeting(meeting)}
-                />
-              ))
-            )}
+        <TabsContent value="all" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filterMeetings(meetings, 'all').map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                onJoin={() => handleJoinMeeting(meeting)}
+                onEdit={() => handleEditMeeting(meeting)}
+              />
+            ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="scheduled" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {scheduledMeetings.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                No scheduled meetings found
-              </div>
-            ) : (
-              scheduledMeetings.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  onEdit={() => handleEditMeeting(meeting)}
-                  onView={() => {}}
-                  onDelete={() => {}}
-                  onJoin={() => handleJoinMeeting(meeting)}
-                />
-              ))
-            )}
+        <TabsContent value="scheduled" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filterMeetings(meetings, 'scheduled').map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                onJoin={() => handleJoinMeeting(meeting)}
+                onEdit={() => handleEditMeeting(meeting)}
+              />
+            ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="past" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pastMeetings.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                No past meetings found
-              </div>
-            ) : (
-              pastMeetings.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  onEdit={() => handleEditMeeting(meeting)}
-                  onView={() => {}}
-                  onDelete={() => {}}
-                  onJoin={() => handleJoinMeeting(meeting)}
-                />
-              ))
-            )}
+        <TabsContent value="past" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filterMeetings(meetings, 'past').map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                onJoin={() => handleJoinMeeting(meeting)}
+                onEdit={() => handleEditMeeting(meeting)}
+              />
+            ))}
           </div>
         </TabsContent>
       </Tabs>
@@ -175,8 +128,9 @@ export function MeetingsClient({ meetings = [], users = [], onMeetingUpdate }) {
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
         meeting={selectedMeeting}
-        onSave={handleSaveMeeting}
         users={users}
+        onSave={handleSaveMeeting}
+        session={session}
       />
     </div>
   )

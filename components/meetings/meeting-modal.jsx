@@ -14,12 +14,14 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
 import { MeetingUsersSelector } from "./meeting-users-selector"
+import { useRouter } from "next/navigation"
 
 export function MeetingModal({ 
   open, 
   onOpenChange, 
   meeting, 
   onSave,
+  session
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -32,6 +34,7 @@ export function MeetingModal({
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const router = useRouter()
 
   useEffect(() => {
     if (meeting) {
@@ -75,6 +78,11 @@ export function MeetingModal({
     setError(null)
 
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://kollerisike-backvideo.wwa.gr'
+      const url = meeting 
+        ? `${apiUrl}/api/meetings/${meeting.id}`
+        : `${apiUrl}/api/meetings`
+
       // Validate required fields
       if (!formData.name || !formData.startTime || !formData.endTime) {
         throw new Error('Please fill in all required fields')
@@ -96,12 +104,11 @@ export function MeetingModal({
 
       console.log('Sending meeting data:', JSON.stringify(meetingData, null, 2))
 
-      // Use the server-side route for updates
-      const response = await fetch(`/api/meetings${meeting?.id ? `/${meeting.id}` : ''}`, {
-        method: meeting?.id ? 'PUT' : 'POST',
+      const response = await fetch(url, {
+        method: meeting ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${session.token}`
         },
         body: JSON.stringify(meetingData)
       })

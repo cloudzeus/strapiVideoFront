@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { format, isValid } from "date-fns"
 import { Calendar, Users, Building2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const [session, setSession] = useState(null)
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeSessions: 0,
@@ -31,17 +32,31 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session')
+        if (!response.ok) {
+          throw new Error('No valid session')
+        }
+        const data = await response.json()
+        setSession(data)
+      } catch (error) {
+        console.error('Session check failed:', error)
+        router.push('/login')
+      }
     }
 
+    checkSession()
+  }, [router])
+
+  useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!session?.token) return
+
       try {
         const response = await fetch('/api/dashboard', {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.token}`,
             'Content-Type': 'application/json'
           }
         })
@@ -91,24 +106,30 @@ export default function AdminDashboard() {
         setLatestUsers(latest)
 
         // Get latest organizations (last 4 created)
-        const latestOrgs = data.organizations
-          ?.filter(org => org.createdAt && isValid(new Date(org.createdAt)))
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 4) || []
+        const latestOrgs = Array.isArray(data.organizations)
+          ? data.organizations
+              .filter(org => org.createdAt && isValid(new Date(org.createdAt)))
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .slice(0, 4)
+          : []
         setLatestOrganizations(latestOrgs)
 
       } catch (error) {
-        console.error("Error fetching dashboard data:", error)
+        console.error('Error fetching dashboard data:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchDashboardData()
-  }, [router])
+  }, [session])
 
   if (isLoading) {
-    return <div className="p-6">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (

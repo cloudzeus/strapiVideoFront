@@ -1,124 +1,126 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { cn } from "@/lib/utils"
+import { useFormStatus } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { Icons } from "@/components/icons"
+import { toast } from "sonner"
 import { login } from "@/app/actions/auth"
+import { useRouter } from "next/navigation"
+import { Lock, Mail } from "lucide-react"
+import Image from "next/image"
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <Button 
+      type="submit" 
+      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 transition-all duration-200" 
+      disabled={pending}
+    >
+      {pending ? "Signing in..." : "Sign in"}
+    </Button>
+  )
+}
 
 export function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useState(null)
   const router = useRouter()
 
-  async function onSubmit(event) {
-    event.preventDefault()
-    setIsLoading(true)
-    setError("")
-
+  async function handleSubmit(formData) {
     try {
-      const formData = new FormData(event.currentTarget)
+      setError(null)
       const result = await login(formData)
-
-      if (result?.error) {
-        setError(result.error)
-        setIsLoading(false)
-        return
-      }
-
-      if (result?.redirect) {
-        // Force a hard navigation to ensure the middleware picks up the new cookies
-        window.location.href = result.redirect
+      
+      if (result?.success && result?.redirect) {
+        router.push(result.redirect)
       }
     } catch (error) {
-      setError("An unexpected error occurred")
-      setIsLoading(false)
+      console.error('Login error:', error)
+      setError(error.message)
+      toast.error(error.message || "Failed to sign in")
     }
   }
 
   return (
-    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-gray-300" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <Image
-            src="https://privateshare.b-cdn.net/wolf_Logo_d2511ce452.svg"
-            alt="Logo"
-            width={100}
-            height={100}
-            className="mr-2"
-          />
-          {process.env.NEXT_PUBLIC_BUYER_NAME}
-        </div>
-        <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg text-gray-700">
-              &ldquo;This platform has transformed how we handle our video meetings and collaborations.&rdquo;
-            </p>
-            <footer className="text-sm text-red-700">Sofia Davis</footer>
-          </blockquote>
-        </div>
-      </div>
-      <div className="lg:p-8">
-        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-          <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your credentials to sign in to your account
-            </p>
+    <div 
+      className="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: 'url("https://privateshare.b-cdn.net/Communication.svg")',
+        backgroundColor: 'rgb(249, 250, 251)',
+        backgroundBlendMode: 'normal'
+      }}
+    >
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+        <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="https://privateshare.b-cdn.net/wolf_Logo_d2511ce452.svg"
+              alt="Logo"
+              width={50}
+              height={50}
+              priority
+            />
           </div>
-          <Card>
-            <CardContent className="pt-6">
-              <form onSubmit={onSubmit}>
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      placeholder="name@example.com"
-                      type="email"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      autoCorrect="off"
-                      disabled={isLoading}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      autoComplete="current-password"
-                      disabled={isLoading}
-                      required
-                    />
-                  </div>
-                  {error && (
-                    <div className="text-sm text-red-500">
-                      {error}
-                    </div>
-                  )}
-                  <Button disabled={isLoading}>
-                    {isLoading && (
-                      <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Sign In
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <h1 className="text-lg font-light text-gray-900 mb-2">
+            ADVANCED VIDEO CONFERENCE MANAGEMENT
+          </h1>
+          <p className="text-sm text-gray-600">
+            Enter your credentials to access your account
+          </p>
         </div>
+
+        <form action={handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email address
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  required
+                  className="pl-10 w-full rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  className="pl-10 w-full rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="pt-4">
+            <SubmitButton />
+          </div>
+        </form>
       </div>
     </div>
   )
