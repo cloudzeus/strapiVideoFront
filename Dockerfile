@@ -1,5 +1,5 @@
 # Base stage for dependencies
-FROM node:20-alpine AS base
+FROM node:20.11-alpine AS base
 WORKDIR /app
 
 # Install system dependencies
@@ -9,11 +9,18 @@ RUN apk add --no-cache libc6-compat
 FROM base AS deps
 WORKDIR /app
 
+# Debug: Show system info
+RUN uname -a && \
+    node --version && \
+    npm --version && \
+    apk info
+
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Debug: Show Node.js and npm versions
-RUN node --version && npm --version
+# Debug: Show package files
+RUN ls -la && \
+    cat package.json
 
 # Install dependencies with verbose output
 RUN npm install --verbose
