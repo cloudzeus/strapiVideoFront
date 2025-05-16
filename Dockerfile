@@ -22,8 +22,8 @@ COPY package.json package-lock.json* ./
 RUN ls -la && \
     cat package.json
 
-# Install dependencies with verbose output
-RUN npm install --verbose
+# Install dependencies with legacy peer deps to handle conflicts
+RUN npm install --verbose --legacy-peer-deps
 
 # Builder stage
 FROM base AS builder
