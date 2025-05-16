@@ -12,8 +12,11 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+# Debug: Show Node.js and npm versions
+RUN node --version && npm --version
+
+# Install dependencies with verbose output
+RUN npm install --verbose
 
 # Builder stage
 FROM base AS builder
