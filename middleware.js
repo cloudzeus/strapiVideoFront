@@ -1,67 +1,68 @@
 import { NextResponse } from 'next/server'
 
-export async function middleware(request) {
-  const token = request.cookies.get('token')?.value
-  const userData = request.cookies.get('user')?.value
+export function middleware(request) {
+  // Get the pathname of the request
   const path = request.nextUrl.pathname
 
-  console.log('Middleware - Path:', path)
-  console.log('Middleware - Token exists:', !!token)
-  console.log('Middleware - UserData exists:', !!userData)
+  // Define public paths that don't require authentication
+  const isPublicPath = path === '/login' || 
+                      path === '/api/auth/login' || 
+                      path === '/api/auth/session' ||
+                      path.startsWith('/_next') ||
+                      path.startsWith('/static') ||
+                      path.startsWith('/api/jitsi') ||
+                      path.includes('.')
 
-  // Allow access to login page, public assets, and API routes
-  if (path === '/login' || 
-      path.startsWith('/_next') || 
-      path.startsWith('/api/auth') ||
-      path.startsWith('/api/jitsi') ||
-      path.includes('.') || // Static files
-      path.startsWith('/js/') ||
-      path.startsWith('/css/')) {
-    return NextResponse.next()
-  }
+  // Get the token and user data from cookies
+  const token = request.cookies.get('token')?.value
+  const userData = request.cookies.get('user')?.value
 
-  // For all other routes, require authentication
-  if (!token || !userData) {
-    console.log('Middleware - Missing token or user data, redirecting to login')
-    const response = NextResponse.redirect(new URL('/login', request.url))
-    // Clear any invalid cookies
-    response.cookies.delete('token')
-    response.cookies.delete('user')
+  // Add CORS headers to all responses
+  const response = NextResponse.next()
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
+  // Handle preflight requests
+  if (request.method === 'OPTIONS') {
     return response
   }
 
-  // For protected routes, check role
-  if (path.startsWith('/admin-')) {
+  // If it's a public path, allow access
+  if (isPublicPath) {
+    return response
+  }
+
+  // If there's no token or user data, redirect to login
+  if (!token || !userData) {
+    // Clear any invalid cookies
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
+    redirectResponse.cookies.delete('token')
+    redirectResponse.cookies.delete('user')
+    return redirectResponse
+  }
+
+  // For admin routes, check if user is an administrator
+  if (path.startsWith('/admin-dashboard') || path.startsWith('/api/admin')) {
     try {
       const user = JSON.parse(userData)
-      if (user.role !== 'Administrator') {
-        console.log('Middleware - Non-admin user accessing admin route, redirecting to dashboard')
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (user.role?.type !== 'administrator') {
+        return NextResponse.redirect(new URL('/login', request.url))
       }
     } catch (error) {
-      console.error('Middleware - Error checking admin access:', error)
-      const response = NextResponse.redirect(new URL('/login', request.url))
-      response.cookies.delete('token')
-      response.cookies.delete('user')
-      return response
+      console.error('Error parsing user data:', error)
+      return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 
   // Add token to API requests
   if (path.startsWith('/api/')) {
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set('Authorization', `Bearer ${token}`)
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    })
+    response.headers.set('Authorization', `Bearer ${token}`)
   }
 
-  return NextResponse.next()
+  return response
 }
 
-// Configure the paths that should be protected
 export const config = {
   matcher: [
     /*
@@ -69,8 +70,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 } 
