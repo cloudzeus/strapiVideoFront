@@ -34,6 +34,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build the application
+ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
 # Runner stage
@@ -49,8 +50,11 @@ RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Debug: Show the contents of the standalone directory
+RUN ls -la .next/standalone || true
 
 # Switch to non-root user
 USER nextjs
@@ -60,4 +64,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", ".next/standalone/server.js"] 
+# Use the correct path for the server file
+CMD ["node", "server.js"] 
