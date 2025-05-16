@@ -9,15 +9,25 @@ export async function middleware(request) {
   console.log('Middleware - Token exists:', !!token)
   console.log('Middleware - UserData exists:', !!userData)
 
-  // Allow access to login page and public assets
-  if (path === '/login' || path.startsWith('/_next') || path.startsWith('/api/auth')) {
+  // Allow access to login page, public assets, and API routes
+  if (path === '/login' || 
+      path.startsWith('/_next') || 
+      path.startsWith('/api/auth') ||
+      path.startsWith('/api/jitsi') ||
+      path.includes('.') || // Static files
+      path.startsWith('/js/') ||
+      path.startsWith('/css/')) {
     return NextResponse.next()
   }
 
   // For all other routes, require authentication
   if (!token || !userData) {
     console.log('Middleware - Missing token or user data, redirecting to login')
-    return NextResponse.redirect(new URL('/login', request.url))
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    // Clear any invalid cookies
+    response.cookies.delete('token')
+    response.cookies.delete('user')
+    return response
   }
 
   // For protected routes, check role

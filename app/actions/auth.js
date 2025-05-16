@@ -58,21 +58,24 @@ export async function login(formData) {
     // Set the JWT token in an HTTP-only cookie
     await cookieStore.set("token", data.jwt, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "lax",
       path: "/",
+      maxAge: 60 * 60 * 24 * 7,
     })
 
     // Set user data in a separate cookie
     await cookieStore.set("user", JSON.stringify({
       id: userData.id,
       email: userData.email,
-      role: userData.role.name
+      role: userData.role.name,
+      name: userData.name || userData.username
     }), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "lax",
       path: "/",
+      maxAge: 60 * 60 * 24 * 7,
     })
 
     // Return success response with redirect path
@@ -89,9 +92,15 @@ export async function login(formData) {
 export async function logout() {
   try {
     const cookieStore = await cookies()
+    
+    // Clear cookies
     await cookieStore.delete("token")
     await cookieStore.delete("user")
-    return { success: true, redirect: "/login" }
+    
+    return {
+      success: true,
+      redirect: "/login"
+    }
   } catch (error) {
     console.error("Logout error:", error)
     throw error
