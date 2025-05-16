@@ -26,7 +26,15 @@ export function AdminHeader({ user }) {
   console.log('AdminHeader - Avatar Data:', user?.avatar)
 
   const handleLogout = async () => {
-    await logout()
+    try {
+      const result = await logout()
+      if (result?.redirect) {
+        // Force a hard navigation to ensure the middleware picks up the cookie changes
+        window.location.href = result.redirect
+      }
+    } catch (error) {
+      console.error("Logout failed:", error)
+    }
   }
 
   const handleEditProfile = (e) => {

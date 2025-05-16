@@ -79,10 +79,19 @@ export async function login(formData) {
 }
 
 export async function logout() {
-  const cookieStore = await cookies()
-  cookieStore.delete("token")
-  cookieStore.delete("userData")
-  return { redirect: "/login" }
+  try {
+    const cookieStore = await cookies()
+    
+    // Clear both cookies
+    cookieStore.delete("token")
+    cookieStore.delete("userData")
+    
+    // Return redirect to login page
+    return { redirect: "/login" }
+  } catch (error) {
+    console.error("Logout error:", error)
+    return { error: "Failed to logout" }
+  }
 }
 
 export async function getSession() {
@@ -130,7 +139,14 @@ export async function requireAuth() {
 export async function requireAdmin() {
   const session = await requireAuth()
   
-  if (session.user.role?.name !== "Administrator") {
+  // Check if session and user exist
+  if (!session?.user) {
+    return { redirect: "/login" }
+  }
+
+  // Safely check the role
+  const userRole = session.user?.role?.name
+  if (userRole !== "Administrator") {
     return { redirect: "/login" }
   }
 

@@ -32,7 +32,8 @@ export function LoginForm() {
       }
 
       if (result?.redirect) {
-        router.push(result.redirect)
+        // Force a hard navigation to ensure the middleware picks up the new cookies
+        window.location.href = result.redirect
       }
     } catch (error) {
       setError("An unexpected error occurred")
@@ -41,71 +42,82 @@ export function LoginForm() {
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-background">
-      <div className="w-full max-w-4xl px-4">
-        <Card className="overflow-hidden">
-          <CardContent className="grid p-0 md:grid-cols-2">
-            <form onSubmit={onSubmit} className="p-6 md:p-8">
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col items-center text-center">
-                  <h1 className="text-xl font-bold">VIDEO MANAGER APPLICATION</h1>
-                  <p className="text-balance text-muted-foreground uppercase">
-                    Login to your account
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="password">Password</Label>
-                    <a
-                      href="#"
-                      className="ml-auto text-sm underline-offset-2 hover:underline"
-                    >
-                      Forgot password?
-                    </a>
+    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
+        <div className="absolute inset-0 bg-gray-300" />
+        <div className="relative z-20 flex items-center text-lg font-medium">
+          <Image
+            src="https://privateshare.b-cdn.net/wolf_Logo_d2511ce452.svg"
+            alt="Logo"
+            width={100}
+            height={100}
+            className="mr-2"
+          />
+          {process.env.NEXT_PUBLIC_BUYER_NAME}
+        </div>
+        <div className="relative z-20 mt-auto">
+          <blockquote className="space-y-2">
+            <p className="text-lg text-gray-700">
+              &ldquo;This platform has transformed how we handle our video meetings and collaborations.&rdquo;
+            </p>
+            <footer className="text-sm text-red-700">Sofia Davis</footer>
+          </blockquote>
+        </div>
+      </div>
+      <div className="lg:p-8">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+          <div className="flex flex-col space-y-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Welcome back
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Enter your credentials to sign in to your account
+            </p>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <form onSubmit={onSubmit}>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      placeholder="name@example.com"
+                      type="email"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      autoCorrect="off"
+                      disabled={isLoading}
+                      required
+                    />
                   </div>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    disabled={isLoading}
-                  />
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      disabled={isLoading}
+                      required
+                    />
+                  </div>
+                  {error && (
+                    <div className="text-sm text-red-500">
+                      {error}
+                    </div>
+                  )}
+                  <Button disabled={isLoading}>
+                    {isLoading && (
+                      <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Sign In
+                  </Button>
                 </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
-                  {isLoading ? "Signing in..." : "Sign in"}
-                </Button>
-              </div>
-            </form>
-            <div className="relative hidden bg-gray-600 md:block">
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <h2 className="mb-8 text-md text-white">VIDEO MANAGER</h2>
-                <Image
-                  src="https://privateshare.b-cdn.net/wolf_Logo_d2511ce452.svg"
-                  alt="Logo"
-                  width={200}
-                  height={200}
-                  className="h-auto w-48"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="mt-4 text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-          By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-          and <a href="#">Privacy Policy</a>.
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
