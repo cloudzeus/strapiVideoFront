@@ -13,13 +13,22 @@ export function middleware(request) {
                       path.startsWith('/api/jitsi') ||
                       path.includes('.')
 
-  // Get the token and user data from cookies
-  const token = request.cookies.get('token')?.value
+  // Get the token from either cookies or Authorization header
+  const token = request.cookies.get('token')?.value || 
+                request.headers.get('authorization')?.split(' ')[1]
   const userData = request.cookies.get('user')?.value
 
   // Add CORS headers to all responses
   const response = NextResponse.next()
-  response.headers.set('Access-Control-Allow-Origin', '*')
+  
+  // Set CORS headers based on environment
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Access-Control-Allow-Origin', process.env.NEXT_PUBLIC_FRONTEND_URL)
+    response.headers.set('Access-Control-Allow-Credentials', 'true')
+  } else {
+    response.headers.set('Access-Control-Allow-Origin', '*')
+  }
+  
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 

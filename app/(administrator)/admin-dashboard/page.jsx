@@ -32,79 +32,136 @@ export default function AdminDashboard() {
       }
 
       try {
-        const response = await fetch('/api/dashboard', {
+        // Fetch users
+        const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users?populate=*&sort=createdAt:desc`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          credentials: 'include'
+          credentials: 'include',
+          cache: 'no-store'
         })
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to fetch dashboard data')
+        if (!usersResponse.ok) {
+          throw new Error('Failed to fetch users')
         }
 
-        return response.json()
+        const usersData = await usersResponse.json()
+        console.log("Users API Response:", usersData)
+
+        // Fetch meetings
+        const meetingsResponse = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/meetings?populate=*&sort=startTime:asc`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include',
+          cache: 'no-store'
+        })
+
+        if (!meetingsResponse.ok) {
+          throw new Error('Failed to fetch meetings')
+        }
+
+        const meetingsData = await meetingsResponse.json()
+        console.log("Meetings API Response:", meetingsData)
+
+        // Fetch organizations
+        const orgsResponse = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/organizations?populate=departments&sort=createdAt:desc`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include',
+          cache: 'no-store'
+        })
+
+        if (!orgsResponse.ok) {
+          throw new Error('Failed to fetch organizations')
+        }
+
+        const orgsData = await orgsResponse.json()
+        console.log("Organizations API Response:", orgsData)
+
+        return {
+          users: usersData,
+          meetings: meetingsData,
+          organizations: orgsData
+        }
       } catch (error) {
         console.error('Dashboard data fetch error:', error)
         throw error
       }
     },
     retry: 1,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: true,
+    staleTime: 0
   })
 
   useEffect(() => {
     if (!dashboardData) return
 
+    console.log("Processing dashboard data:", dashboardData)
+
     // Update stats
     setStats({
       totalUsers: Array.isArray(dashboardData.users) ? dashboardData.users.length : 0,
       activeSessions: 0,
-      totalMeetings: dashboardData.meetings?.length || 0,
-      totalOrganizations: dashboardData.organizations?.length || 0
+      totalMeetings: Array.isArray(dashboardData.meetings?.data) ? dashboardData.meetings.data.length : 0,
+      totalOrganizations: Array.isArray(dashboardData.organizations?.data) ? dashboardData.organizations.data.length : 0
     })
-
-    // Get upcoming meetings (next 4 closest to today)
-    const now = new Date()
-    const upcoming = dashboardData.meetings
-      ?.filter(meeting => {
-        const startTime = meeting.startTime
-        if (!startTime) return false
-        const meetingDate = new Date(startTime)
-        return dateFnsIsValid(meetingDate) && meetingDate > now
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.startTime)
-        const dateB = new Date(b.startTime)
-        // Calculate time difference from now
-        const diffA = Math.abs(dateA - now)
-        const diffB = Math.abs(dateB - now)
-        // Sort by closest to now
-        return diffA - diffB
-      })
-      .slice(0, 4) || []
-    setUpcomingMeetings(upcoming)
 
     // Get latest users (last 4 created)
     const latest = Array.isArray(dashboardData.users) 
       ? dashboardData.users
-          .filter(user => user.createdAt && dateFnsIsValid(new Date(user.createdAt)))
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .filter(user => {
+            const createdAt = user.createdAt
+            console.log("User createdAt:", createdAt, "for user:", user.email)
+            return createdAt && dateFnsIsValid(new Date(createdAt))
+          })
+          .sort((a, b) => {
+            const dateA = new Date(a.createdAt)
+            const dateB = new Date(b.createdAt)
+            console.log("Comparing dates:", dateA, dateB)
+            return dateB - dateA
+          })
           .slice(0, 4)
       : []
+    
+    console.log("Latest users after processing:", latest)
     setLatestUsers(latest)
 
-    // Get latest organizations (last 4 created)
-    const latestOrgs = Array.isArray(dashboardData.organizations)
-      ? dashboardData.organizations
-          .filter(org => org.createdAt && dateFnsIsValid(new Date(org.createdAt)))
+    // Get upcoming meetings
+    const upcoming = Array.isArray(dashboardData.meetings?.data)
+      ? dashboardData.meetings.data
+          .filter(meeting => {
+            const startTime = meeting.startTime
+            return startTime && dateFnsIsValid(new Date(startTime)) && new Date(startTime) > new Date()
+          })
+          .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+          .slice(0, 4)
+      : []
+
+    console.log("Upcoming meetings after processing:", upcoming)
+    setUpcomingMeetings(upcoming)
+
+    // Get latest organizations
+    const latestOrgs = Array.isArray(dashboardData.organizations?.data)
+      ? dashboardData.organizations.data
+          .filter(org => {
+            const createdAt = org.createdAt
+            return createdAt && dateFnsIsValid(new Date(createdAt))
+          })
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           .slice(0, 4)
       : []
+
+    console.log("Latest organizations after processing:", latestOrgs)
     setLatestOrgs(latestOrgs)
+
   }, [dashboardData])
 
   if (isLoading) {
@@ -206,26 +263,31 @@ export default function AdminDashboard() {
         <h3 className="text-xl font-semibold mb-4">Latest Users</h3>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {latestUsers.length > 0 ? (
-            latestUsers.map(user => (
-              <div key={user.id} className="rounded-lg border bg-card p-4 shadow-xl hover:shadow-2xl transition-all hover:bg-gray-50">
-                <div className="flex flex-col mb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1 uppercase">{user.username || user.email || 'Unnamed User'}</h4>
-                    <span className="text-[10px] bg-black text-white px-2 py-1 rounded-full whitespace-nowrap">
-                      {format(new Date(user.createdAt), "PPP")}
-                    </span>
+            latestUsers.map(user => {
+              console.log("Rendering user:", user)
+              return (
+                <div key={user.id} className="rounded-lg border bg-card p-4 shadow-xl hover:shadow-2xl transition-all hover:bg-gray-50">
+                  <div className="flex flex-col mb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-semibold text-gray-800 line-clamp-2 flex-1 uppercase">
+                        {user.name || user.username || user.email || 'Unnamed User'}
+                      </h4>
+                      <span className="text-[10px] bg-black text-white px-2 py-1 rounded-full whitespace-nowrap">
+                        {format(new Date(user.createdAt), "PPP")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500 line-clamp-1">
+                      {user.email || 'No email provided'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Joined: {format(new Date(user.createdAt), "PPP")}
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-xs text-gray-500 line-clamp-1">
-                    {user.email || 'No email provided'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Joined: {format(new Date(user.createdAt), "PPP")}
-                  </div>
-                </div>
-              </div>
-            ))
+              )
+            })
           ) : (
             <div className="col-span-full text-center text-gray-500 text-sm">No users found</div>
           )}

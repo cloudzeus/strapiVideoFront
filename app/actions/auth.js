@@ -58,10 +58,11 @@ export async function login(formData) {
     // Set the JWT token in an HTTP-only cookie
     await cookieStore.set("token", data.jwt, {
       httpOnly: true,
-      secure: true,
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
     })
 
     // Set user data in a separate cookie
@@ -75,16 +76,27 @@ export async function login(formData) {
       name: userData.name || userData.username
     }), {
       httpOnly: true,
-      secure: true,
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
     })
 
-    // Return success response with redirect path
+    // Return the data for client-side storage
     return {
       success: true,
-      redirect: userData.role.type === "administrator" ? "/admin-dashboard" : "/dashboard"
+      redirect: userData.role?.type === "administrator" ? "/admin-dashboard" : "/dashboard",
+      token: data.jwt,
+      user: {
+        id: userData.id,
+        email: userData.email,
+        role: {
+          name: userData.role.name,
+          type: userData.role.type
+        },
+        name: userData.name || userData.username
+      }
     }
   } catch (error) {
     console.error("Login error:", error)

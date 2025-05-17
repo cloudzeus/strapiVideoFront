@@ -34,6 +34,11 @@ export function LoginForm() {
       const result = await login(formData)
       
       if (result?.success && result?.redirect) {
+        // Store token and user data in localStorage
+        localStorage.setItem('token', result.token)
+        localStorage.setItem('userData', JSON.stringify(result.user))
+        
+        // Redirect to the appropriate dashboard
         window.location.href = result.redirect
       }
     } catch (error) {

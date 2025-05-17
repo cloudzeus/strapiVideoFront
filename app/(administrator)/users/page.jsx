@@ -85,11 +85,20 @@ export default function UsersPage() {
           {
             headers: {
               Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
             },
+            credentials: 'include',
+            cache: 'no-store'
           }
         )
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired or invalid
+            localStorage.removeItem('token')
+            window.location.href = '/login'
+            return []
+          }
           console.error("API Error:", response.status, response.statusText)
           throw new Error(`Failed to fetch users: ${response.status}`)
         }
@@ -97,13 +106,8 @@ export default function UsersPage() {
         const responseData = await response.json()
         console.log("Raw API Response:", responseData)
         
-        // The API returns an array directly
-        if (Array.isArray(responseData)) {
-          return responseData
-        } else {
-          console.error("Unexpected API response format:", responseData)
-          return []
-        }
+        // Return the array directly since Strapi is returning an array
+        return responseData
       } catch (error) {
         console.error("Error fetching users:", error)
         throw error
@@ -131,11 +135,20 @@ export default function UsersPage() {
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
+          credentials: 'include',
+          cache: 'no-store'
         }
       )
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired or invalid
+          localStorage.removeItem('token')
+          window.location.href = '/login'
+          return []
+        }
         throw new Error(`Failed to fetch organizations: ${response.status}`)
       }
 
@@ -259,7 +272,6 @@ export default function UsersPage() {
   // Helper function to safely get user data
   const getUserData = (user) => {
     if (!user) return null
-    // The API returns user data directly on the object, not under attributes
     return user
   }
 
@@ -276,6 +288,7 @@ export default function UsersPage() {
       const searchLower = searchQuery.toLowerCase()
       const searchableFields = [
         userData.email,
+        userData.username,
         userData.name,
         userData.lastName,
         userData.phone,
