@@ -68,7 +68,10 @@ export async function login(formData) {
     await cookieStore.set("user", JSON.stringify({
       id: userData.id,
       email: userData.email,
-      role: userData.role.name,
+      role: {
+        name: userData.role.name,
+        type: userData.role.type
+      },
       name: userData.name || userData.username
     }), {
       httpOnly: true,
@@ -81,7 +84,7 @@ export async function login(formData) {
     // Return success response with redirect path
     return {
       success: true,
-      redirect: userData.role.name === "Administrator" ? "/admin-dashboard" : "/dashboard"
+      redirect: userData.role.type === "administrator" ? "/admin-dashboard" : "/dashboard"
     }
   } catch (error) {
     console.error("Login error:", error)
@@ -146,7 +149,7 @@ export async function requireAdmin() {
   if (!session) {
     redirect("/login")
   }
-  if (session.user.role !== "Administrator") {
+  if (session.user.role?.type !== "administrator") {
     redirect("/dashboard")
   }
   return session

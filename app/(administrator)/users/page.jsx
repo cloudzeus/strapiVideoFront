@@ -355,6 +355,33 @@ export default function UsersPage() {
         avatarId = uploadData[0].id
       }
 
+      // Prepare the data to send to Strapi
+      const userData = {
+        email: formData.get('email'),
+        name: formData.get('name'),
+        lastName: formData.get('lastName'),
+        jobPosition: formData.get('jobPosition'),
+        phone: formData.get('phone'),
+        workPhone: formData.get('workPhone'),
+        mobilePhone: formData.get('mobilePhone'),
+        address: formData.get('address'),
+        city: formData.get('city'),
+        zip: formData.get('zip'),
+        country: formData.get('country'),
+        role: formData.get('role'),
+        confirmed: formData.get('confirmed') === 'true',
+        blocked: formData.get('blocked') === 'true',
+        avatar: avatarId,
+      }
+
+      // Add organization and department if they are selected
+      if (selectedOrganization) {
+        userData.organization = selectedOrganization
+      }
+      if (selectedDepartment) {
+        userData.department = selectedDepartment
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users/${selectedUser.id}`,
         {
@@ -363,25 +390,7 @@ export default function UsersPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            email: formData.get('email'),
-            name: formData.get('name'),
-            lastName: formData.get('lastName'),
-            jobPosition: formData.get('jobPosition'),
-            phone: formData.get('phone'),
-            workPhone: formData.get('workPhone'),
-            mobilePhone: formData.get('mobilePhone'),
-            address: formData.get('address'),
-            city: formData.get('city'),
-            zip: formData.get('zip'),
-            country: formData.get('country'),
-            role: formData.get('role'),
-            department: formData.get('department'),
-            organization: formData.get('organization'),
-            confirmed: formData.get('confirmed') === 'true',
-            blocked: formData.get('blocked') === 'true',
-            avatar: avatarId,
-          }),
+          body: JSON.stringify(userData),
         }
       )
 

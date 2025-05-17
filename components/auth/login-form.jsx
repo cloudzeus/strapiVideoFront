@@ -34,7 +34,7 @@ export function LoginForm() {
       const result = await login(formData)
       
       if (result?.success && result?.redirect) {
-        router.push(result.redirect)
+        window.location.href = result.redirect
       }
     } catch (error) {
       console.error('Login error:', error)
